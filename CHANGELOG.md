@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.15] – 2025-08-23
+### Added
+- Floating Dice: d20 **Advantage/Disadvantage** and a **multi-dice custom roller** with **drop lowest** and mod.
+- Presets: **2d6**, **3d6**, **4d6-L** with detailed breakdown in the log.
+
+
 ## [0.1.14] – 2025-08-23
 ### Changed
 - Floating Dice: larger button, same-button toggle, and an “unravel from button” animation.
