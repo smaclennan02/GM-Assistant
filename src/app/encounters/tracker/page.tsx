@@ -5,6 +5,7 @@ import { useStorageState } from "@/storage/useStorageState";
 import { localDriver } from "@/storage/localDriver";
 import { STORAGE_KEYS } from "@/storage/keys";
 import type { CharactersState, PC } from "@/types/characters";
+import { CONDITIONS, CONDITION_TIPS, CONDITION_META, type ConditionKey } from "@/lib/conditions";
 
 /** Combatant in the encounter. Linked to PCs via pcId; NPCs have no pcId. */
 type Combatant = {
@@ -14,9 +15,9 @@ type Combatant = {
   hp: number | null;
   ac: number | null;
   isPC?: boolean;
-  pcId?: string;     // link to Characters store
-  tags?: string[];   // legacy (safe to keep)
-  conditions?: string[]; // NEW in 0.1.7
+  pcId?: string;
+  tags?: string[];
+  conditions?: string[];
 };
 
 type EncounterState = {
@@ -44,34 +45,7 @@ function parseMaybeNumber(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/* ---------- Conditions dictionary (short rules for tooltips) ---------- */
-const CONDITIONS = [
-  "Blinded","Charmed","Deafened","Frightened","Grappled","Incapacitated",
-  "Invisible","Paralyzed","Petrified","Poisoned","Prone","Restrained",
-  "Stunned","Unconscious","Exhaustion"
-] as const;
-
-const CONDITION_TIPS: Record<string, string> = {
-  Blinded: "Fails sight checks; attacks vs it have adv; its attacks have disadv.",
-  Charmed: "Can’t attack charmer; charmer has advantage on social checks.",
-  Deafened: "Can’t hear; fails sound-based checks.",
-  Frightened: "Disadv on checks/attacks while source visible; can’t move closer.",
-  Grappled: "Speed 0; ends if grappler is incapacitated or moved away.",
-  Incapacitated: "Can’t take actions or reactions.",
-  Invisible: "Unseen; attacks vs it have disadv; its attacks have adv.",
-  Paralyzed: "Incapacitated; can’t move/speak; auto fail Str/Dex saves; attacks vs it have adv; crits within 5 ft.",
-  Petrified: "Transformed to stone; incapacitated; resists all damage; vulnerable to bludgeoning.",
-  Poisoned: "Disadv on attacks and ability checks.",
-  Prone: "Crawl; disadv on attacks; attacks vs it have adv if within 5 ft, otherwise disadv.",
-  Restrained: "Speed 0; disadv on attacks and Dex saves; attacks vs it have adv.",
-  Stunned: "Incapacitated; can’t move; fails Str/Dex saves; attacks vs it have adv.",
-  Unconscious: "Incapacitated; drops items; prone; fails Str/Dex saves; attacks within 5 ft crit.",
-  Exhaustion: "Levels 1–6; penalties scale. (Track level in notes.)"
-};
-
-/* ---------- Component ---------- */
 export default function InitiativePage() {
-  /** Encounter (persistent) */
   const [enc, setEnc] = useStorageState<EncounterState>({
     key: STORAGE_KEYS.ENCOUNTERS,
     driver: localDriver,
@@ -79,7 +53,6 @@ export default function InitiativePage() {
     version: 1,
   });
 
-  /** Characters (read-only) */
   const [chars] = useStorageState<CharactersState>({
     key: STORAGE_KEYS.CHARACTERS,
     driver: localDriver,
@@ -87,13 +60,11 @@ export default function InitiativePage() {
     version: 1,
   });
 
-  /** Derived: PCs already linked in encounter */
   const pcIdsInEncounter = useMemo(
     () => new Set(enc.combatants.filter(c => c.pcId).map(c => c.pcId as string)),
     [enc.combatants]
   );
 
-  /** Sort display: highest init first; null low; PCs before NPCs on tie; then name */
   const sorted = useMemo(() => {
     const arr = [...enc.combatants];
     if (enc.orderLocked) return arr;
@@ -108,9 +79,6 @@ export default function InitiativePage() {
     });
   }, [enc.combatants, enc.orderLocked]);
 
-  /* ---------- Actions ---------- */
-
-  /** Add any PCs not currently in the encounter (init left blank) */
   const addMissingPCs = useCallback(() => {
     const count = chars?.pcs?.length ?? 0;
     if (!count) return;
@@ -120,18 +88,15 @@ export default function InitiativePage() {
       const existingByPcId = new Map(
         e.combatants.filter(c => c.pcId).map(c => [c.pcId as string, c])
       );
-
       const additions: Combatant[] = [];
       for (const pc of chars.pcs) {
         if (!existingByPcId.has(pc.id)) additions.push(pcToCombatant(pc));
       }
       if (!additions.length) return e;
-
       return { ...e, combatants: [...e.combatants, ...additions], updatedAt: now };
     });
   }, [chars?.pcs, setEnc]);
 
-  /** Sync PC-linked combatants with latest Characters data (keep initiative) */
   const syncLinkedPCs = useCallback(() => {
     if (!chars?.pcs?.length) return;
     const pcById = new Map(chars.pcs.map(p => [p.id, p]));
@@ -147,14 +112,13 @@ export default function InitiativePage() {
           ac: typeof pc.ac === "number" ? pc.ac : c.ac,
           hp: typeof pc.hp?.current === "number" ? pc.hp.current : c.hp,
           isPC: true,
-          conditions: c.conditions ?? []
+          conditions: c.conditions ?? [],
         };
       }),
       updatedAt: Date.now(),
     }));
   }, [chars?.pcs, setEnc]);
 
-  /** Clear all initiatives (leave everyone in the list) */
   const clearAllInits = useCallback(() => {
     setEnc(e => ({
       ...e,
@@ -195,7 +159,6 @@ export default function InitiativePage() {
     setEnc(e => ({ ...e, round: Math.max(1, e.round - 1), updatedAt: Date.now() }));
   }, [setEnc]);
 
-  /* ---------- Conditions helpers ---------- */
   const toggleCondition = useCallback((id: string, cond: string) => {
     setEnc(e => ({
       ...e,
@@ -218,19 +181,15 @@ export default function InitiativePage() {
     }));
   }, [setEnc]);
 
-  /* ---------- QoL: auto-load PCs & keyboard shortcuts ---------- */
-
-  // Auto-load PCs the first time you open the tracker if the encounter is empty
   const autoloadRef = useRef(false);
   useEffect(() => {
     if (autoloadRef.current) return;
     if (enc.combatants.length === 0 && (chars?.pcs?.length ?? 0) > 0) {
       autoloadRef.current = true;
-      addMissingPCs();  // runs once per mount
+      addMissingPCs();
     }
   }, [enc.combatants.length, chars?.pcs?.length, addMissingPCs]);
 
-  // Keyboard shortcuts: [ = prev round, ] = next round, L = lock/unlock
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -245,42 +204,32 @@ export default function InitiativePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [prevRound, nextRound, toggleLock]);
 
-  /* ---------- UI State ---------- */
-
   const [npcName, setNpcName] = useState("");
 
   return (
     <div className="p-0 space-y-6">
-      {/* Header with spacing & grouping */}
       <header className="rounded-lg border p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold">Encounter Tracker</h1>
           <p className="text-xs opacity-60">Shortcuts: [ and ] change round • L toggles lock</p>
         </div>
 
-        {/* Controls */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Round controls grouped */}
           <div className="flex items-center gap-2">
             <button className="px-3 py-2 border rounded" onClick={prevRound} aria-label="Previous round">−</button>
             <div className="px-3 py-2 border rounded">Round <b>{enc.round}</b></div>
             <button className="px-3 py-2 border rounded" onClick={nextRound} aria-label="Next round">+</button>
           </div>
-
-          {/* Divider on wider screens */}
           <div className="hidden sm:block h-6 w-px bg-neutral-800" />
-
           <button className="px-3 py-2 border rounded" onClick={toggleLock} aria-pressed={enc.orderLocked}>
             {enc.orderLocked ? "Unlock Order" : "Lock Order"}
           </button>
-
           <button className="px-3 py-2 border rounded" onClick={clearAllInits} title="Set all initiatives to blank">
             Clear Inits
           </button>
         </div>
       </header>
 
-      {/* Party controls */}
       <section className="rounded-lg border p-4 space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold">Party</h2>
@@ -311,7 +260,6 @@ export default function InitiativePage() {
         </div>
       </section>
 
-      {/* Quick NPC add */}
       <section className="rounded-lg border p-4 space-y-2">
         <h3 className="font-semibold">Quick NPC</h3>
         <div className="flex gap-2">
@@ -327,7 +275,6 @@ export default function InitiativePage() {
         </div>
       </section>
 
-      {/* Table */}
       <section className="rounded-lg border overflow-x-auto">
         <table className="w-full text-left table-ui sticky-header table-tight">
           <thead>
@@ -337,7 +284,7 @@ export default function InitiativePage() {
               <th className="px-3 py-2">HP</th>
               <th className="px-3 py-2">AC</th>
               <th className="px-3 py-2">Type</th>
-              <th className="px-3 py-2">Conditions</th>{/* NEW */}
+              <th className="px-3 py-2">Conditions</th>
               <th className="px-3 py-2 text-right">Actions</th>
             </tr>
           </thead>
@@ -392,25 +339,29 @@ export default function InitiativePage() {
                       </span>
                     )}
                   </td>
-                  {/* Conditions column */}
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
-                      {conds.map(cond => (
-                        <span
-                          key={cond}
-                          title={CONDITION_TIPS[cond] || ""}
-                          className="inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs"
-                        >
-                          {cond}
-                          <button
-                            className="ml-1 rounded-full px-1 text-xs border"
-                            title="Remove"
-                            onClick={() => toggleCondition(c.id, cond)}
+                      {conds.map((cond) => {
+                        const meta = CONDITION_META[(cond as ConditionKey)] ?? null;
+                        const Icon = meta?.icon;
+                        return (
+                          <span
+                            key={cond}
+                            title={CONDITION_TIPS[cond as ConditionKey] || ""}
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs border ${meta?.bg ?? "bg-white/5"} ${meta?.border ?? "border-white/20"} ${meta?.text ?? "text-white"}`}
                           >
-                            ×
-                          </button>
-                        </span>
-                      ))}
+                            {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+                            {cond}
+                            <button
+                              className="ml-1 rounded-full px-1 text-xs border border-current/40"
+                              title="Remove"
+                              onClick={() => toggleCondition(c.id, cond)}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
                       <select
                         aria-label="Add condition"
                         className="border rounded px-2 py-1 text-xs bg-transparent"
@@ -460,7 +411,6 @@ export default function InitiativePage() {
   );
 }
 
-/** Helper: convert a PC to a combatant (init left null so DM only types initiative) */
 function pcToCombatant(pc: PC): Combatant {
   return {
     id: newId(),
@@ -471,6 +421,6 @@ function pcToCombatant(pc: PC): Combatant {
     ac: typeof pc.ac === "number" ? pc.ac : null,
     isPC: true,
     tags: [],
-    conditions: [], // NEW
+    conditions: [],
   };
 }

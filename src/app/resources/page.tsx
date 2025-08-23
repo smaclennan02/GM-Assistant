@@ -7,33 +7,9 @@ import { useStorageState } from "@/storage/useStorageState";
 import { localDriver } from "@/storage/localDriver";
 import { STORAGE_KEYS } from "@/storage/keys";
 import type { CharactersState } from "@/types/characters";
+import { CONDITIONS, CONDITION_TIPS, CONDITION_META, type ConditionKey } from "@/lib/conditions";
 
-/* ================== Reference Data ================== */
-
-const CONDITIONS = [
-  "Blinded","Charmed","Deafened","Frightened","Grappled","Incapacitated",
-  "Invisible","Paralyzed","Petrified","Poisoned","Prone","Restrained",
-  "Stunned","Unconscious","Exhaustion"
-] as const;
-
-const CONDITION_TIPS: Record<string, string> = {
-  Blinded: "Sight-based checks fail; attacks vs it have adv; its attacks have disadv.",
-  Charmed: "Can’t attack charmer; charmer has advantage on social checks.",
-  Deafened: "Can’t hear; fails sound-based checks.",
-  Frightened: "Disadv on checks/attacks while source visible; can’t move closer.",
-  Grappled: "Speed 0; ends if grappler is incapacitated or moved away.",
-  Incapacitated: "Can’t take actions or reactions.",
-  Invisible: "Unseen; attacks vs it have disadv; its attacks have adv.",
-  Paralyzed: "Incapacitated; can’t move/speak; auto-fail Str/Dex saves; attacks vs it have adv; crits within 5 ft.",
-  Petrified: "Turned to stone; incapacitated; resists most damage; vulnerable to bludgeoning.",
-  Poisoned: "Disadvantage on attacks and ability checks.",
-  Prone: "Crawl; disadv on attacks; attackers within 5 ft have advantage.",
-  Restrained: "Speed 0; disadv on attacks and Dex saves; attacks vs it have adv.",
-  Stunned: "Incapacitated; can’t move; fails Str/Dex saves; attacks vs it have adv.",
-  Unconscious: "Incapacitated; prone; auto-fail Str/Dex saves; attacks within 5 ft crit.",
-  Exhaustion: "Levels 1–6; penalties escalate. (Track level below.)",
-};
-
+/* Exhaustion summaries (kept local here) */
 const EXHAUSTION_LEVELS: { level: number; summary: string }[] = [
   { level: 0, summary: "No penalties." },
   { level: 1, summary: "Disadvantage on ability checks." },
@@ -44,13 +20,11 @@ const EXHAUSTION_LEVELS: { level: number; summary: string }[] = [
   { level: 6, summary: "Dead." },
 ];
 
-/* ================== Storage Types ================== */
-
 type PCResources = {
-  exhaustion?: number;        // 0–6
+  exhaustion?: number;
   notes?: string;
-  lastShort?: number;         // epoch ms
-  lastLong?: number;          // epoch ms
+  lastShort?: number;
+  lastLong?: number;
 };
 
 type ResourcesState = {
@@ -63,18 +37,13 @@ const initialResources: ResourcesState = {
   updatedAt: Date.now(),
 };
 
-/* ================== Helpers ================== */
-
 function fmtWhen(ts?: number): string {
   if (!ts) return "—";
   const d = new Date(ts);
   return d.toLocaleString();
 }
 
-/* ================== Page ================== */
-
 export default function ResourcesPage() {
-  // Characters (read-only)
   const [chars] = useStorageState<CharactersState>({
     key: STORAGE_KEYS.CHARACTERS,
     driver: localDriver,
@@ -82,15 +51,12 @@ export default function ResourcesPage() {
     version: 1,
   });
 
-  // Resources (read/write)
   const [res, setRes] = useStorageState<ResourcesState>({
     key: STORAGE_KEYS.RESOURCES,
     driver: localDriver,
     initial: initialResources,
     version: 1,
   });
-
-  /* -------- Conditions Reference -------- */
 
   const [q, setQ] = useState("");
   const filteredConditions = useMemo(() => {
@@ -100,8 +66,6 @@ export default function ResourcesPage() {
       c.toLowerCase().includes(s) || (CONDITION_TIPS[c]?.toLowerCase().includes(s))
     );
   }, [q]);
-
-  /* -------- Party Rest & Exhaustion -------- */
 
   const pcs = chars.pcs ?? [];
 
@@ -118,14 +82,11 @@ export default function ResourcesPage() {
 
   const shortRest = (pcId: string) => updPcRes(pcId, { lastShort: Date.now() });
   const longRest = (pcId: string) => updPcRes(pcId, { lastLong: Date.now(), exhaustion: 0 });
-
   const setExhaustion = (pcId: string, delta: number) => {
     const cur = res.byPcId[pcId]?.exhaustion ?? 0;
     const next = Math.max(0, Math.min(6, cur + delta));
     updPcRes(pcId, { exhaustion: next });
   };
-
-  /* ================== Render ================== */
 
   return (
     <div className="space-y-6">
@@ -150,14 +111,21 @@ export default function ResourcesPage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredConditions.map((c) => (
-            <div key={c} className="rounded-lg border p-3 bg-white/5">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium">{c}</h3>
+          {filteredConditions.map((c) => {
+            const meta = CONDITION_META[c as ConditionKey];
+            const Icon = meta?.icon;
+            return (
+              <div key={c} className="rounded-lg border p-3 bg-white/5">
+                <div className="flex items-center justify-between">
+                  <span className={`inline-flex items-center gap-2 border rounded-full px-2.5 py-1 text-xs ${meta.bg} ${meta.border} ${meta.text}`}>
+                    {Icon ? <Icon className="h-4 w-4" /> : null}
+                    <strong className="tracking-wide">{c}</strong>
+                  </span>
+                </div>
+                <p className="text-sm opacity-85 mt-2">{CONDITION_TIPS[c]}</p>
               </div>
-              <p className="text-sm opacity-80 mt-1">{CONDITION_TIPS[c]}</p>
-            </div>
-          ))}
+            );
+          })}
           {filteredConditions.length === 0 && (
             <div className="text-sm opacity-70">No matches.</div>
           )}
