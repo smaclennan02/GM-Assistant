@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.14] – 2025-08-23
+### Changed
+- Floating Dice: larger button, same-button toggle, and an “unravel from button” animation.
+
 ## [0.1.13] – 2025-08-23
 ### Changed
 - Tracker Effects: “+” now opens a **cursor-anchored popover** with a compact icon grid and search.
