@@ -45,6 +45,76 @@ function parseMaybeNumber(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/* ---------------- Effects Picker (overlay, stable width) ---------------- */
+function EffectsPicker({
+  current,
+  onPick,
+  onClear,
+}: {
+  current: string[];
+  onPick: (k: ConditionKey) => void;
+  onClear: () => void;
+}) {
+  const available = CONDITIONS.filter((k) => !current.includes(k));
+  const onSelect = (e: React.MouseEvent<HTMLButtonElement>, k?: ConditionKey) => {
+    const details = (e.currentTarget.closest("details") as HTMLDetailsElement | null);
+    if (k) onPick(k);
+    if (details) details.open = false; // close menu
+  };
+
+  return (
+    <details className="relative">
+      <summary className="list-none">
+        <button
+          type="button"
+          className="h-6 w-6 grid place-items-center border rounded hover:bg-white/10"
+          title="Add effect"
+        >
+          +
+        </button>
+      </summary>
+      <div className="absolute right-0 z-50 mt-2 w-56 max-h-64 overflow-auto rounded border bg-neutral-950 p-2 shadow-lg">
+        {available.length > 0 ? (
+          available.map((k) => {
+            const meta = CONDITION_META[k];
+            const Icon = meta.icon;
+            return (
+              <button
+                key={k}
+                type="button"
+                className={`w-full flex items-center gap-2 px-2 py-1 rounded border ${meta.bg} ${meta.border} ${meta.text} hover:bg-white/10 text-sm`}
+                onClick={(e) => onSelect(e, k)}
+                title={CONDITION_TIPS[k]}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{k}</span>
+                <span className="ml-auto text-xs opacity-70">add</span>
+              </button>
+            );
+          })
+        ) : (
+          <div className="px-2 py-1 text-xs opacity-70">All effects applied</div>
+        )}
+        <div className="my-2 border-t border-neutral-800" />
+        <button
+          type="button"
+          className="w-full px-2 py-1 rounded border hover:bg-white/10 text-xs"
+          onClick={(e) => onSelect(e)}
+          onMouseDown={(e) => {
+            // onMouseDown fires before details toggles; keep menu open until click handler runs
+            e.preventDefault();
+            onClear();
+          }}
+          title="Remove all effects from this combatant"
+        >
+          Clear all effects
+        </button>
+      </div>
+    </details>
+  );
+}
+
+/* ---------------- Page ---------------- */
 export default function InitiativePage() {
   const [enc, setEnc] = useStorageState<EncounterState>({
     key: STORAGE_KEYS.ENCOUNTERS,
@@ -61,7 +131,7 @@ export default function InitiativePage() {
   });
 
   const pcIdsInEncounter = useMemo(
-    () => new Set(enc.combatants.filter(c => c.pcId).map(c => c.pcId as string)),
+    () => new Set(enc.combatants.filter((c) => c.pcId).map((c) => c.pcId as string)),
     [enc.combatants]
   );
 
@@ -79,14 +149,15 @@ export default function InitiativePage() {
     });
   }, [enc.combatants, enc.orderLocked]);
 
+  /* ---------- Actions ---------- */
   const addMissingPCs = useCallback(() => {
     const count = chars?.pcs?.length ?? 0;
     if (!count) return;
     const now = Date.now();
 
-    setEnc(e => {
+    setEnc((e) => {
       const existingByPcId = new Map(
-        e.combatants.filter(c => c.pcId).map(c => [c.pcId as string, c])
+        e.combatants.filter((c) => c.pcId).map((c) => [c.pcId as string, c])
       );
       const additions: Combatant[] = [];
       for (const pc of chars.pcs) {
@@ -99,10 +170,10 @@ export default function InitiativePage() {
 
   const syncLinkedPCs = useCallback(() => {
     if (!chars?.pcs?.length) return;
-    const pcById = new Map(chars.pcs.map(p => [p.id, p]));
-    setEnc(e => ({
+    const pcById = new Map(chars.pcs.map((p) => [p.id, p]));
+    setEnc((e) => ({
       ...e,
-      combatants: e.combatants.map(c => {
+      combatants: e.combatants.map((c) => {
         if (!c.pcId) return c;
         const pc = pcById.get(c.pcId);
         if (!pc) return c;
@@ -120,67 +191,100 @@ export default function InitiativePage() {
   }, [chars?.pcs, setEnc]);
 
   const clearAllInits = useCallback(() => {
-    setEnc(e => ({
+    setEnc((e) => ({
       ...e,
-      combatants: e.combatants.map(c => ({ ...c, init: null })),
+      combatants: e.combatants.map((c) => ({ ...c, init: null })),
       updatedAt: Date.now(),
     }));
   }, [setEnc]);
 
-  const remove = useCallback((id: string) => {
-    setEnc(e => ({ ...e, combatants: e.combatants.filter(c => c.id !== id), updatedAt: Date.now() }));
-  }, [setEnc]);
+  const remove = useCallback(
+    (id: string) => {
+      setEnc((e) => ({
+        ...e,
+        combatants: e.combatants.filter((c) => c.id !== id),
+        updatedAt: Date.now(),
+      }));
+    },
+    [setEnc]
+  );
 
-  const update = useCallback((id: string, patch: Partial<Combatant>) => {
-    setEnc(e => ({
-      ...e,
-      combatants: e.combatants.map(c => (c.id === id ? { ...c, ...patch } : c)),
-      updatedAt: Date.now(),
-    }));
-  }, [setEnc]);
+  const update = useCallback(
+    (id: string, patch: Partial<Combatant>) => {
+      setEnc((e) => ({
+        ...e,
+        combatants: e.combatants.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        updatedAt: Date.now(),
+      }));
+    },
+    [setEnc]
+  );
 
-  const addNPC = useCallback((name: string) => {
-    setEnc(e => ({
-      ...e,
-      combatants: [...e.combatants, { id: newId(), name: name || "NPC", init: null, hp: null, ac: null, isPC: false, tags: [], conditions: [] }],
-      updatedAt: Date.now(),
-    }));
-  }, [setEnc]);
+  const addNPC = useCallback(
+    (name: string) => {
+      setEnc((e) => ({
+        ...e,
+        combatants: [
+          ...e.combatants,
+          {
+            id: newId(),
+            name: name || "NPC",
+            init: null,
+            hp: null,
+            ac: null,
+            isPC: false,
+            tags: [],
+            conditions: [],
+          },
+        ],
+        updatedAt: Date.now(),
+      }));
+    },
+    [setEnc]
+  );
 
   const toggleLock = useCallback(() => {
-    setEnc(e => ({ ...e, orderLocked: !e.orderLocked, updatedAt: Date.now() }));
+    setEnc((e) => ({ ...e, orderLocked: !e.orderLocked, updatedAt: Date.now() }));
   }, [setEnc]);
 
   const nextRound = useCallback(() => {
-    setEnc(e => ({ ...e, round: Math.max(1, e.round + 1), updatedAt: Date.now() }));
+    setEnc((e) => ({ ...e, round: Math.max(1, e.round + 1), updatedAt: Date.now() }));
   }, [setEnc]);
 
   const prevRound = useCallback(() => {
-    setEnc(e => ({ ...e, round: Math.max(1, e.round - 1), updatedAt: Date.now() }));
+    setEnc((e) => ({ ...e, round: Math.max(1, e.round - 1), updatedAt: Date.now() }));
   }, [setEnc]);
 
-  const toggleCondition = useCallback((id: string, cond: string) => {
-    setEnc(e => ({
-      ...e,
-      combatants: e.combatants.map(c => {
-        if (c.id !== id) return c;
-        const list = c.conditions ?? [];
-        const exists = list.includes(cond);
-        const next = exists ? list.filter(x => x !== cond) : [...list, cond];
-        return { ...c, conditions: next };
-      }),
-      updatedAt: Date.now(),
-    }));
-  }, [setEnc]);
+  /* ---------- Effects helpers ---------- */
+  const toggleCondition = useCallback(
+    (id: string, cond: string) => {
+      setEnc((e) => ({
+        ...e,
+        combatants: e.combatants.map((c) => {
+          if (c.id !== id) return c;
+          const list = c.conditions ?? [];
+          const exists = list.includes(cond);
+          const next = exists ? list.filter((x) => x !== cond) : [...list, cond];
+          return { ...c, conditions: next };
+        }),
+        updatedAt: Date.now(),
+      }));
+    },
+    [setEnc]
+  );
 
-  const clearConditions = useCallback((id: string) => {
-    setEnc(e => ({
-      ...e,
-      combatants: e.combatants.map(c => (c.id === id ? { ...c, conditions: [] } : c)),
-      updatedAt: Date.now(),
-    }));
-  }, [setEnc]);
+  const clearConditions = useCallback(
+    (id: string) => {
+      setEnc((e) => ({
+        ...e,
+        combatants: e.combatants.map((c) => (c.id === id ? { ...c, conditions: [] } : c)),
+        updatedAt: Date.now(),
+      }));
+    },
+    [setEnc]
+  );
 
+  /* ---------- QoL: auto-load PCs & keyboard shortcuts ---------- */
   const autoloadRef = useRef(false);
   useEffect(() => {
     if (autoloadRef.current) return;
@@ -194,20 +298,35 @@ export default function InitiativePage() {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        target?.isContentEditable
+      )
+        return;
 
-      if (e.code === "BracketLeft") { e.preventDefault(); prevRound(); }
-      else if (e.code === "BracketRight") { e.preventDefault(); nextRound(); }
-      else if (e.key === "l" || e.key === "L") { e.preventDefault(); toggleLock(); }
+      if (e.code === "BracketLeft") {
+        e.preventDefault();
+        prevRound();
+      } else if (e.code === "BracketRight") {
+        e.preventDefault();
+        nextRound();
+      } else if (e.key === "l" || e.key === "L") {
+        e.preventDefault();
+        toggleLock();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [prevRound, nextRound, toggleLock]);
 
+  /* ---------- UI ---------- */
   const [npcName, setNpcName] = useState("");
 
   return (
     <div className="p-0 space-y-6">
+      {/* Header */}
       <header className="rounded-lg border p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold">Encounter Tracker</h1>
@@ -216,9 +335,15 @@ export default function InitiativePage() {
 
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <button className="px-3 py-2 border rounded" onClick={prevRound} aria-label="Previous round">−</button>
-            <div className="px-3 py-2 border rounded">Round <b>{enc.round}</b></div>
-            <button className="px-3 py-2 border rounded" onClick={nextRound} aria-label="Next round">+</button>
+            <button className="px-3 py-2 border rounded" onClick={prevRound} aria-label="Previous round">
+              −
+            </button>
+            <div className="px-3 py-2 border rounded">
+              Round <b>{enc.round}</b>
+            </div>
+            <button className="px-3 py-2 border rounded" onClick={nextRound} aria-label="Next round">
+              +
+            </button>
           </div>
           <div className="hidden sm:block h-6 w-px bg-neutral-800" />
           <button className="px-3 py-2 border rounded" onClick={toggleLock} aria-pressed={enc.orderLocked}>
@@ -230,15 +355,22 @@ export default function InitiativePage() {
         </div>
       </header>
 
+      {/* Party controls */}
       <section className="rounded-lg border p-4 space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold">Party</h2>
-          <span className="text-sm opacity-70">PCs: <b>{chars?.pcs?.length ?? 0}</b></span>
-          <span className="text-sm opacity-70">Loaded: <b>{pcIdsInEncounter.size}</b></span>
+          <span className="text-sm opacity-70">
+            PCs: <b>{chars?.pcs?.length ?? 0}</b>
+          </span>
+          <span className="text-sm opacity-70">
+            Loaded: <b>{pcIdsInEncounter.size}</b>
+          </span>
           <div className="ml-auto flex gap-2">
             <button
               type="button"
-              className={`px-3 py-2 border rounded ${(!chars?.pcs?.length ? "opacity-50 cursor-not-allowed" : "cursor-pointer")}`}
+              className={`px-3 py-2 border rounded ${
+                !chars?.pcs?.length ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+              }`}
               onClick={addMissingPCs}
               disabled={!chars?.pcs?.length}
               title={!chars?.pcs?.length ? "Add PCs in the Characters tab first" : "Add any missing PCs to this encounter"}
@@ -260,6 +392,7 @@ export default function InitiativePage() {
         </div>
       </section>
 
+      {/* Quick NPC add */}
       <section className="rounded-lg border p-4 space-y-2">
         <h3 className="font-semibold">Quick NPC</h3>
         <div className="flex gap-2">
@@ -275,6 +408,7 @@ export default function InitiativePage() {
         </div>
       </section>
 
+      {/* Table */}
       <section className="rounded-lg border overflow-x-auto">
         <table className="w-full text-left table-ui sticky-header table-tight">
           <thead>
@@ -284,7 +418,7 @@ export default function InitiativePage() {
               <th className="px-3 py-2">HP</th>
               <th className="px-3 py-2">AC</th>
               <th className="px-3 py-2">Type</th>
-              <th className="px-3 py-2">Conditions</th>
+              <th className="px-3 py-2 w-56">Effects</th> {/* fixed width to prevent jump */}
               <th className="px-3 py-2 text-right">Actions</th>
             </tr>
           </thead>
@@ -292,7 +426,7 @@ export default function InitiativePage() {
             {sorted.map((c) => {
               const conds = c.conditions ?? [];
               return (
-                <tr key={c.id} className="border-t">
+                <tr key={c.id} className="border-t align-top">
                   <td className="px-3 py-2">
                     <input
                       className="px-2 py-1 border rounded w-full input-compact"
@@ -339,54 +473,31 @@ export default function InitiativePage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {conds.map((cond) => {
-                        const meta = CONDITION_META[(cond as ConditionKey)] ?? null;
-                        const Icon = meta?.icon;
-                        return (
-                          <span
-                            key={cond}
-                            title={CONDITION_TIPS[cond as ConditionKey] || ""}
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs border ${meta?.bg ?? "bg-white/5"} ${meta?.border ?? "border-white/20"} ${meta?.text ?? "text-white"}`}
-                          >
-                            {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-                            {cond}
+                  {/* Effects column: icons only + stable width + picker */}
+                  <td className="px-3 py-2 w-56 align-top">
+                    <div className="flex items-start gap-2">
+                      <div className="flex flex-wrap gap-1 min-h-6">
+                        {conds.map((cond) => {
+                          const meta = CONDITION_META[cond as ConditionKey];
+                          const Icon = meta?.icon;
+                          return (
                             <button
-                              className="ml-1 rounded-full px-1 text-xs border border-current/40"
-                              title="Remove"
+                              key={cond}
+                              type="button"
+                              title={`${cond}: ${CONDITION_TIPS[cond as ConditionKey] || ""}\n(click to remove)`}
+                              className={`h-6 w-6 grid place-items-center rounded border ${meta?.bg ?? "bg-white/5"} ${meta?.border ?? "border-white/20"} ${meta?.text ?? "text-white"} hover:bg-white/10`}
                               onClick={() => toggleCondition(c.id, cond)}
                             >
-                              ×
+                              {Icon ? <Icon className="h-3.5 w-3.5" /> : <span className="text-xs">?</span>}
                             </button>
-                          </span>
-                        );
-                      })}
-                      <select
-                        aria-label="Add condition"
-                        className="border rounded px-2 py-1 text-xs bg-transparent"
-                        value=""
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (!val) return;
-                          toggleCondition(c.id, val);
-                          e.currentTarget.value = "";
-                        }}
-                      >
-                        <option value="" disabled>Add…</option>
-                        {CONDITIONS.map(k => (
-                          <option key={k} value={k} title={CONDITION_TIPS[k]}>{k}</option>
-                        ))}
-                      </select>
-                      {conds.length > 0 && (
-                        <button
-                          className="px-2 py-1 border rounded text-xs"
-                          onClick={() => clearConditions(c.id)}
-                          title="Clear all conditions"
-                        >
-                          Clear
-                        </button>
-                      )}
+                          );
+                        })}
+                      </div>
+                      <EffectsPicker
+                        current={conds}
+                        onPick={(k) => toggleCondition(c.id, k)}
+                        onClear={() => clearConditions(c.id)}
+                      />
                     </div>
                   </td>
                   <td className="px-3 py-2 text-right">
@@ -411,6 +522,7 @@ export default function InitiativePage() {
   );
 }
 
+/** Helper: convert a PC to a combatant (init left null so DM only types initiative) */
 function pcToCombatant(pc: PC): Combatant {
   return {
     id: newId(),

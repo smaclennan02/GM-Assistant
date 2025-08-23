@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.10] – 2025-08-23
+### Changed
+- Tracker effects are now **icon-only** with hover tooltips (no text chips).
+### Added
+- Inline **Effects picker** (➕ button) with a compact overlay menu.
+### Improved
+- Layout stability: fixed-width effects column; no horizontal jump when adding/removing multiple effects.
+
 ## [0.1.9] – 2025-08-23
 ### Added
 - **Color-coded condition icons** across Tracker and Resources (unique icon + tinted badge per condition).
