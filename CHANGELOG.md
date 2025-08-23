@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.12] – 2025-08-23
+### Added
+- **Tracker QoL**:
+  - Inline **d20 roll** on each combatant; uses PC **initMod** when present (or +0).
+  - **Export/Import Encounter** (JSON) to reuse later.
+  - **Bulk actions**: remove all NPCs, clear all effects, reset encounter.
+### Notes
+- Stable layout preserved (fixed-width Effects column). Compatible with existing data.
+
 ## [0.1.11] – 2025-08-23
 ### Fixed
 - Tracker Effects picker: guarded missing icons to prevent “Element type is invalid” crash.

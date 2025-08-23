@@ -6,6 +6,7 @@ import { localDriver } from "@/storage/localDriver";
 import { STORAGE_KEYS } from "@/storage/keys";
 import type { CharactersState, PC } from "@/types/characters";
 import { CONDITIONS, CONDITION_TIPS, CONDITION_META, type ConditionKey } from "@/lib/conditions";
+import { downloadJSON, uploadJSON } from "@/lib/io";
 
 type Combatant = {
   id: string;
@@ -43,7 +44,11 @@ function parseMaybeNumber(v: string): number | null {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
+function d20(): number {
+  return Math.floor(Math.random() * 20) + 1;
+}
 
+/* Effects Picker (icon menu) */
 function EffectsPicker({
   current,
   onPick,
@@ -75,25 +80,20 @@ function EffectsPicker({
         {available.length > 0 ? (
           available.map((k) => {
             const meta = CONDITION_META[k];
-const Icon = meta?.icon;
-return (
-  <button
-    key={k}
-    type="button"
-    className={`w-full flex items-center gap-2 px-2 py-1 rounded border ${meta.bg} ${meta.border} ${meta.text} hover:bg-white/10 text-sm`}
-    onClick={(e) => onSelect(e, k)}
-    title={CONDITION_TIPS[k]}
-  >
-    {Icon ? (
-      <Icon className="h-4 w-4" />
-    ) : (
-      <span className="h-4 w-4 grid place-items-center text-xs">?</span>
-    )}
-    <span>{k}</span>
-    <span className="ml-auto text-xs opacity-70">add</span>
-  </button>
-);
-
+            const Icon = meta?.icon;
+            return (
+              <button
+                key={k}
+                type="button"
+                className={`w-full flex items-center gap-2 px-2 py-1 rounded border ${meta.bg} ${meta.border} ${meta.text} hover:bg-white/10 text-sm`}
+                onClick={(e) => onSelect(e, k)}
+                title={CONDITION_TIPS[k]}
+              >
+                {Icon ? <Icon className="h-4 w-4" /> : <span className="h-4 w-4 grid place-items-center text-xs">?</span>}
+                <span>{k}</span>
+                <span className="ml-auto text-xs opacity-70">add</span>
+              </button>
+            );
           })
         ) : (
           <div className="px-2 py-1 text-xs opacity-70">All effects applied</div>
@@ -131,6 +131,8 @@ export default function InitiativePage() {
     version: 1,
   });
 
+  const pcById = useMemo(() => new Map((chars?.pcs ?? []).map(p => [p.id, p])), [chars?.pcs]);
+
   const pcIdsInEncounter = useMemo(
     () => new Set(enc.combatants.filter((c) => c.pcId).map((c) => c.pcId as string)),
     [enc.combatants]
@@ -150,6 +152,15 @@ export default function InitiativePage() {
     });
   }, [enc.combatants, enc.orderLocked]);
 
+  /* Helpers */
+  const getInitMod = useCallback((c: Combatant) => {
+    if (!c.pcId) return 0;
+    const pc = pcById.get(c.pcId);
+    const mod = (pc && (pc as any).initMod);
+    return typeof mod === "number" ? mod : 0;
+  }, [pcById]);
+
+  /* Actions */
   const addMissingPCs = useCallback(() => {
     const count = chars?.pcs?.length ?? 0;
     if (!count) return;
@@ -170,12 +181,12 @@ export default function InitiativePage() {
 
   const syncLinkedPCs = useCallback(() => {
     if (!chars?.pcs?.length) return;
-    const pcById = new Map(chars.pcs.map((p) => [p.id, p]));
+    const pcByIdLocal = new Map(chars.pcs.map((p) => [p.id, p]));
     setEnc((e) => ({
       ...e,
       combatants: e.combatants.map((c) => {
         if (!c.pcId) return c;
-        const pc = pcById.get(c.pcId);
+        const pc = pcByIdLocal.get(c.pcId);
         if (!pc) return c;
         return {
           ...c,
@@ -283,6 +294,72 @@ export default function InitiativePage() {
     [setEnc]
   );
 
+  /* Bulk actions */
+  const removeAllNPCs = useCallback(() => {
+    setEnc(e => ({
+      ...e,
+      combatants: e.combatants.filter(c => c.isPC),
+      updatedAt: Date.now(),
+    }));
+  }, [setEnc]);
+
+  const clearAllEffects = useCallback(() => {
+    setEnc(e => ({
+      ...e,
+      combatants: e.combatants.map(c => ({ ...c, conditions: [] })),
+      updatedAt: Date.now(),
+    }));
+  }, [setEnc]);
+
+  const resetEncounter = useCallback(() => {
+    setEnc(e => ({
+      ...initialEncounter,
+      updatedAt: Date.now(),
+    }));
+  }, [setEnc]);
+
+  /* Export/Import */
+  const exportEncounter = useCallback(() => {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      encounter: enc,
+    };
+    downloadJSON("encounter.json", payload);
+  }, [enc]);
+
+  const importEncounter = useCallback(async () => {
+    try {
+      const data = await uploadJSON();
+      const payload = (data as any) ?? {};
+      const incoming = payload.encounter ?? payload;
+      if (!incoming || !Array.isArray(incoming.combatants)) {
+        alert("Invalid encounter file");
+        return;
+      }
+      const clean: EncounterState = {
+        combatants: (incoming.combatants as any[]).map((c) => ({
+          id: typeof c.id === "string" ? c.id : newId(),
+          name: String(c.name ?? "Unnamed"),
+          init: typeof c.init === "number" ? c.init : null,
+          hp: typeof c.hp === "number" ? c.hp : null,
+          ac: typeof c.ac === "number" ? c.ac : null,
+          isPC: !!c.isPC,
+          pcId: typeof c.pcId === "string" ? c.pcId : undefined,
+          tags: Array.isArray(c.tags) ? c.tags.map(String) : [],
+          conditions: Array.isArray(c.conditions) ? c.conditions.map(String) : [],
+        })),
+        round: Math.max(1, Number(incoming.round ?? 1)),
+        orderLocked: !!incoming.orderLocked,
+        updatedAt: Date.now(),
+      };
+      setEnc(clean);
+    } catch (e) {
+      alert("Import failed");
+    }
+  }, [setEnc]);
+
+  /* QoL */
   const autoloadRef = useRef(false);
   useEffect(() => {
     if (autoloadRef.current) return;
@@ -296,24 +373,11 @@ export default function InitiativePage() {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
-      if (
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        tag === "SELECT" ||
-        target?.isContentEditable
-      )
-        return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
 
-      if (e.code === "BracketLeft") {
-        e.preventDefault();
-        prevRound();
-      } else if (e.code === "BracketRight") {
-        e.preventDefault();
-        nextRound();
-      } else if (e.key === "l" || e.key === "L") {
-        e.preventDefault();
-        toggleLock();
-      }
+      if (e.code === "BracketLeft") { e.preventDefault(); prevRound(); }
+      else if (e.code === "BracketRight") { e.preventDefault(); nextRound(); }
+      else if (e.key === "l" || e.key === "L") { e.preventDefault(); toggleLock(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -331,15 +395,9 @@ export default function InitiativePage() {
 
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <button className="px-3 py-2 border rounded" onClick={prevRound} aria-label="Previous round">
-              −
-            </button>
-            <div className="px-3 py-2 border rounded">
-              Round <b>{enc.round}</b>
-            </div>
-            <button className="px-3 py-2 border rounded" onClick={nextRound} aria-label="Next round">
-              +
-            </button>
+            <button className="px-3 py-2 border rounded" onClick={prevRound} aria-label="Previous round">−</button>
+            <div className="px-3 py-2 border rounded">Round <b>{enc.round}</b></div>
+            <button className="px-3 py-2 border rounded" onClick={nextRound} aria-label="Next round">+</button>
           </div>
           <div className="hidden sm:block h-6 w-px bg-neutral-800" />
           <button className="px-3 py-2 border rounded" onClick={toggleLock} aria-pressed={enc.orderLocked}>
@@ -351,21 +409,30 @@ export default function InitiativePage() {
         </div>
       </header>
 
+      {/* Bulk actions */}
+      <section className="rounded-lg border p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="font-semibold">Bulk Actions</h2>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button className="px-3 py-2 border rounded" onClick={removeAllNPCs} title="Remove all NPC entries">Remove all NPCs</button>
+            <button className="px-3 py-2 border rounded" onClick={clearAllEffects} title="Clear all effects from everyone">Clear all effects</button>
+            <button className="px-3 py-2 border rounded" onClick={resetEncounter} title="Clear list and reset round to 1">Reset encounter</button>
+            <button className="px-3 py-2 border rounded" onClick={exportEncounter} title="Download encounter as JSON">Export</button>
+            <button className="px-3 py-2 border rounded" onClick={importEncounter} title="Load an encounter from JSON">Import</button>
+          </div>
+        </div>
+      </section>
+
+      {/* Party controls */}
       <section className="rounded-lg border p-4 space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold">Party</h2>
-          <span className="text-sm opacity-70">
-            PCs: <b>{chars?.pcs?.length ?? 0}</b>
-          </span>
-          <span className="text-sm opacity-70">
-            Loaded: <b>{pcIdsInEncounter.size}</b>
-          </span>
+          <span className="text-sm opacity-70">PCs: <b>{chars?.pcs?.length ?? 0}</b></span>
+          <span className="text-sm opacity-70">Loaded: <b>{pcIdsInEncounter.size}</b></span>
           <div className="ml-auto flex gap-2">
             <button
               type="button"
-              className={`px-3 py-2 border rounded ${
-                !chars?.pcs?.length ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}
+              className={`px-3 py-2 border rounded ${(!chars?.pcs?.length ? "opacity-50 cursor-not-allowed" : "cursor-pointer")}`}
               onClick={addMissingPCs}
               disabled={!chars?.pcs?.length}
               title={!chars?.pcs?.length ? "Add PCs in the Characters tab first" : "Add any missing PCs to this encounter"}
@@ -387,6 +454,7 @@ export default function InitiativePage() {
         </div>
       </section>
 
+      {/* Quick NPC add */}
       <section className="rounded-lg border p-4 space-y-2">
         <h3 className="font-semibold">Quick NPC</h3>
         <div className="flex gap-2">
@@ -402,6 +470,7 @@ export default function InitiativePage() {
         </div>
       </section>
 
+      {/* Table */}
       <section className="rounded-lg border overflow-x-auto">
         <table className="w-full text-left table-ui sticky-header table-tight">
           <thead>
@@ -418,6 +487,7 @@ export default function InitiativePage() {
           <tbody>
             {sorted.map((c) => {
               const conds = c.conditions ?? [];
+              const pcMod = getInitMod(c);
               return (
                 <tr key={c.id} className="border-t align-top">
                   <td className="px-3 py-2">
@@ -428,14 +498,32 @@ export default function InitiativePage() {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      className="px-2 py-1 border rounded w-24 input-compact"
-                      value={c.init ?? ""}
-                      onChange={(e) => update(c.id, { init: parseMaybeNumber(e.target.value) })}
-                      inputMode="numeric"
-                      placeholder="—"
-                      title="Enter initiative manually"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="px-2 py-1 border rounded w-24 input-compact"
+                        value={c.init ?? ""}
+                        onChange={(e) => update(c.id, { init: parseMaybeNumber(e.target.value) })}
+                        inputMode="numeric"
+                        placeholder="—"
+                        title="Enter initiative manually"
+                      />
+                      <button
+                        type="button"
+                        className="px-2 py-1 border rounded text-xs"
+                        title={c.isPC ? `Roll d20 + ${pcMod >= 0 ? "+" : ""}${pcMod}` : "Roll d20"}
+                        onClick={() => {
+                          const roll = d20() + (c.isPC ? pcMod : 0);
+                          update(c.id, { init: roll });
+                        }}
+                      >
+                        🎲 Roll
+                      </button>
+                    </div>
+                    {c.isPC ? (
+                      <div className="text-[10px] opacity-60 mt-1">
+                        Mod: {pcMod >= 0 ? "+" : ""}{pcMod}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2">
                     <input
