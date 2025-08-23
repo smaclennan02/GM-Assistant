@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8] – 2025-08-23
+### Added
+- **Resources v1** page:
+  - **Conditions**: searchable reference with concise rules summaries.
+  - **Party Rest**: per-PC Short Rest / Long Rest actions with timestamps.
+  - **Exhaustion**: per-PC level 0–6 with level descriptions.
+### Notes
+- New persistent store key: `gma.v1.resources` (added to `STORAGE_KEYS`).
+- Backward compatible; no changes required to Characters or Encounters.
+
 ## [0.1.7] – 2025-08-23
 ### Added
 - **Tracker: Conditions** — per-combatant condition chips (Prone, Grappled, Poisoned, etc.) with tooltips; click to remove.
