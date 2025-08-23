@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.11] – 2025-08-23
+### Fixed
+- Tracker Effects picker: guarded missing icons to prevent “Element type is invalid” crash.
+- Replaced rare Lucide icons with widely supported ones (Restrained → Lock, Exhaustion → Battery).
+
 ## [0.1.10] – 2025-08-23
 ### Changed
 - Tracker effects are now **icon-only** with hover tooltips (no text chips).

@@ -7,7 +7,6 @@ import { STORAGE_KEYS } from "@/storage/keys";
 import type { CharactersState, PC } from "@/types/characters";
 import { CONDITIONS, CONDITION_TIPS, CONDITION_META, type ConditionKey } from "@/lib/conditions";
 
-/** Combatant in the encounter. Linked to PCs via pcId; NPCs have no pcId. */
 type Combatant = {
   id: string;
   name: string;
@@ -45,7 +44,6 @@ function parseMaybeNumber(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/* ---------------- Effects Picker (overlay, stable width) ---------------- */
 function EffectsPicker({
   current,
   onPick,
@@ -59,7 +57,7 @@ function EffectsPicker({
   const onSelect = (e: React.MouseEvent<HTMLButtonElement>, k?: ConditionKey) => {
     const details = (e.currentTarget.closest("details") as HTMLDetailsElement | null);
     if (k) onPick(k);
-    if (details) details.open = false; // close menu
+    if (details) details.open = false;
   };
 
   return (
@@ -77,20 +75,25 @@ function EffectsPicker({
         {available.length > 0 ? (
           available.map((k) => {
             const meta = CONDITION_META[k];
-            const Icon = meta.icon;
-            return (
-              <button
-                key={k}
-                type="button"
-                className={`w-full flex items-center gap-2 px-2 py-1 rounded border ${meta.bg} ${meta.border} ${meta.text} hover:bg-white/10 text-sm`}
-                onClick={(e) => onSelect(e, k)}
-                title={CONDITION_TIPS[k]}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{k}</span>
-                <span className="ml-auto text-xs opacity-70">add</span>
-              </button>
-            );
+const Icon = meta?.icon;
+return (
+  <button
+    key={k}
+    type="button"
+    className={`w-full flex items-center gap-2 px-2 py-1 rounded border ${meta.bg} ${meta.border} ${meta.text} hover:bg-white/10 text-sm`}
+    onClick={(e) => onSelect(e, k)}
+    title={CONDITION_TIPS[k]}
+  >
+    {Icon ? (
+      <Icon className="h-4 w-4" />
+    ) : (
+      <span className="h-4 w-4 grid place-items-center text-xs">?</span>
+    )}
+    <span>{k}</span>
+    <span className="ml-auto text-xs opacity-70">add</span>
+  </button>
+);
+
           })
         ) : (
           <div className="px-2 py-1 text-xs opacity-70">All effects applied</div>
@@ -101,7 +104,6 @@ function EffectsPicker({
           className="w-full px-2 py-1 rounded border hover:bg-white/10 text-xs"
           onClick={(e) => onSelect(e)}
           onMouseDown={(e) => {
-            // onMouseDown fires before details toggles; keep menu open until click handler runs
             e.preventDefault();
             onClear();
           }}
@@ -114,7 +116,6 @@ function EffectsPicker({
   );
 }
 
-/* ---------------- Page ---------------- */
 export default function InitiativePage() {
   const [enc, setEnc] = useStorageState<EncounterState>({
     key: STORAGE_KEYS.ENCOUNTERS,
@@ -149,7 +150,6 @@ export default function InitiativePage() {
     });
   }, [enc.combatants, enc.orderLocked]);
 
-  /* ---------- Actions ---------- */
   const addMissingPCs = useCallback(() => {
     const count = chars?.pcs?.length ?? 0;
     if (!count) return;
@@ -255,7 +255,6 @@ export default function InitiativePage() {
     setEnc((e) => ({ ...e, round: Math.max(1, e.round - 1), updatedAt: Date.now() }));
   }, [setEnc]);
 
-  /* ---------- Effects helpers ---------- */
   const toggleCondition = useCallback(
     (id: string, cond: string) => {
       setEnc((e) => ({
@@ -284,7 +283,6 @@ export default function InitiativePage() {
     [setEnc]
   );
 
-  /* ---------- QoL: auto-load PCs & keyboard shortcuts ---------- */
   const autoloadRef = useRef(false);
   useEffect(() => {
     if (autoloadRef.current) return;
@@ -321,12 +319,10 @@ export default function InitiativePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [prevRound, nextRound, toggleLock]);
 
-  /* ---------- UI ---------- */
   const [npcName, setNpcName] = useState("");
 
   return (
     <div className="p-0 space-y-6">
-      {/* Header */}
       <header className="rounded-lg border p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold">Encounter Tracker</h1>
@@ -355,7 +351,6 @@ export default function InitiativePage() {
         </div>
       </header>
 
-      {/* Party controls */}
       <section className="rounded-lg border p-4 space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold">Party</h2>
@@ -392,7 +387,6 @@ export default function InitiativePage() {
         </div>
       </section>
 
-      {/* Quick NPC add */}
       <section className="rounded-lg border p-4 space-y-2">
         <h3 className="font-semibold">Quick NPC</h3>
         <div className="flex gap-2">
@@ -408,7 +402,6 @@ export default function InitiativePage() {
         </div>
       </section>
 
-      {/* Table */}
       <section className="rounded-lg border overflow-x-auto">
         <table className="w-full text-left table-ui sticky-header table-tight">
           <thead>
@@ -418,7 +411,7 @@ export default function InitiativePage() {
               <th className="px-3 py-2">HP</th>
               <th className="px-3 py-2">AC</th>
               <th className="px-3 py-2">Type</th>
-              <th className="px-3 py-2 w-56">Effects</th> {/* fixed width to prevent jump */}
+              <th className="px-3 py-2 w-56">Effects</th>
               <th className="px-3 py-2 text-right">Actions</th>
             </tr>
           </thead>
@@ -473,7 +466,6 @@ export default function InitiativePage() {
                       </span>
                     )}
                   </td>
-                  {/* Effects column: icons only + stable width + picker */}
                   <td className="px-3 py-2 w-56 align-top">
                     <div className="flex items-start gap-2">
                       <div className="flex flex-wrap gap-1 min-h-6">
@@ -522,7 +514,6 @@ export default function InitiativePage() {
   );
 }
 
-/** Helper: convert a PC to a combatant (init left null so DM only types initiative) */
 function pcToCombatant(pc: PC): Combatant {
   return {
     id: newId(),

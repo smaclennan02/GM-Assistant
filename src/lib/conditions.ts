@@ -1,8 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 import {
   EyeOff, Heart, VolumeX, AlertTriangle, Link as LinkIcon, Ban, Ghost,
-  PauseCircle, Gem, Skull, ArrowDown, Handcuffs, Zap, Moon, BatteryLow
+  PauseCircle, Gem, Skull, ArrowDown, Lock, Zap, Moon, Battery
 } from "lucide-react";
+
 
 /** Canonical list used everywhere */
 export const CONDITIONS = [
@@ -50,8 +51,8 @@ export const CONDITION_META: Record<ConditionKey, Meta> = {
   Petrified:   { icon: Gem,         text: "text-zinc-300",    bg: "bg-zinc-500/10",    border: "border-zinc-500/30" },
   Poisoned:    { icon: Skull,       text: "text-green-300",   bg: "bg-green-500/10",   border: "border-green-500/30" },
   Prone:       { icon: ArrowDown,   text: "text-cyan-300",    bg: "bg-cyan-500/10",    border: "border-cyan-500/30" },
-  Restrained:  { icon: Handcuffs,   text: "text-red-300",     bg: "bg-red-500/10",     border: "border-red-500/30" },
   Stunned:     { icon: Zap,         text: "text-indigo-300",  bg: "bg-indigo-500/10",  border: "border-indigo-500/30" },
   Unconscious: { icon: Moon,        text: "text-sky-300",     bg: "bg-sky-500/10",     border: "border-sky-500/30" },
-  Exhaustion:  { icon: BatteryLow,  text: "text-lime-300",    bg: "bg-lime-500/10",    border: "border-lime-500/30" },
+  Restrained:  { icon: Lock,     text: "text-red-300",     bg: "bg-red-500/10",     border: "border-red-500/30" },
+  Exhaustion:  { icon: Battery,  text: "text-lime-300",    bg: "bg-lime-500/10",    border: "border-lime-500/30" },
 };
