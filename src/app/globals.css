@@ -1,0 +1,265 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* === TEMP SITE-WIDE DARK MODE OVERRIDES === */
+html.dark body { background-color: rgb(10 10 10); color: rgb(245 245 245); }
+html.dark .bg-white { background-color: rgb(24 24 27) !important; }
+html.dark .bg-white\/80 { background-color: rgba(24,24,27,0.80) !important; }
+html.dark .bg-white\/70 { background-color: rgba(24,24,27,0.70) !important; }
+html.dark .bg-white\/60 { background-color: rgba(24,24,27,0.60) !important; }
+html.dark .bg-parchment { background-color: rgb(24 24 27) !important; }
+html.dark .bg-parchment\/90 { background-color: rgba(24,24,27,0.90) !important; }
+html.dark .bg-parchment\/80 { background-color: rgba(24,24,27,0.80) !important; }
+html.dark .bg-black\/5 { background-color: rgba(255,255,255,0.06) !important; }
+html.dark .border { border-color: rgb(63 63 70) !important; }
+html.dark input, html.dark select, html.dark textarea {
+  background-color: rgb(24 24 27) !important;
+  color: rgb(243 244 246) !important;
+  border-color: rgb(63 63 70) !important;
+}
+html.dark .card, html.dark .bg-card { background-color: rgb(24 24 27) !important; }
+html.dark .text-muted-foreground { color: rgb(161 161 170) !important; }
+html.dark table tr { border-color: rgb(63 63 70) !important; }
+
+/* === TEMP SITE-WIDE DARK MODE OVERRIDES === */
+html.dark body {
+  background-color: rgb(10 10 10);
+  color: rgb(245 245 245);
+}
+
+/* Common light backgrounds → dark equivalents */
+html.dark .bg-white { background-color: rgb(24 24 27) !important; }
+html.dark .bg-white\/80 { background-color: rgba(24,24,27,0.80) !important; }
+html.dark .bg-white\/70 { background-color: rgba(24,24,27,0.70) !important; }
+html.dark .bg-white\/60 { background-color: rgba(24,24,27,0.60) !important; }
+
+/* Your custom parchment backgrounds → dark equivalents */
+html.dark .bg-parchment { background-color: rgb(24 24 27) !important; }
+html.dark .bg-parchment\/90 { background-color: rgba(24,24,27,0.90) !important; }
+html.dark .bg-parchment\/80 { background-color: rgba(24,24,27,0.80) !important; }
+
+/* Light table headers using bg-black/5 are too faint on dark */
+html.dark .bg-black\/5 { background-color: rgba(255,255,255,0.06) !important; }
+
+/* Borders & form fields */
+html.dark .border { border-color: rgb(63 63 70) !important; }
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: rgb(24 24 27) !important;
+  color: rgb(243 244 246) !important;
+  border-color: rgb(63 63 70) !important;
+}
+
+/* Cards / generic surfaces */
+html.dark .card,
+html.dark .bg-card {
+  background-color: rgb(24 24 27) !important;
+}
+
+/* Muted text */
+html.dark .text-muted-foreground { color: rgb(161 161 170) !important; }
+
+/* Table row separators on dark */
+html.dark table tr { border-color: rgb(63 63 70) !important; }
+
+/* === DARK MODE NAV RESCUE === */
+/* Make any header/nav text visible on dark */
+html.dark header,
+html.dark nav {
+  color: rgb(244 244 245) !important; /* near-white */
+}
+
+/* Ensure links inside nav/header inherit the light color */
+html.dark header a,
+html.dark nav a {
+  color: inherit !important;
+}
+
+/* Common dark-text utility classes that would hide on dark bg */
+html.dark .text-black,
+html.dark .text-neutral-900,
+html.dark .text-slate-900 {
+  color: rgb(244 244 245) !important;
+}
+
+/* If icons were using black strokes/fills, flip them to light */
+html.dark .stroke-black,
+html.dark .fill-black {
+  stroke: rgb(244 244 245) !important;
+  fill: rgb(244 244 245) !important;
+}
+
+/* Give nav a subtle dark surface if it relied on bg-white */
+html.dark header,
+html.dark nav {
+  background-color: rgba(24, 24, 27, 0.90) !important; /* ~zinc-900 with slight alpha */
+  border-bottom: 1px solid rgb(63 63 70) !important;    /* subtle divider */
+}
+
+/* === GLOBAL READABILITY & UX POLISH === */
+
+/* Better selection color */
+::selection { background: rgba(147, 197, 253, 0.25); }
+
+/* Nicer scrollbars on dark */
+html.dark * {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(82 82 91) rgb(24 24 27);
+}
+html.dark *::-webkit-scrollbar { height: 10px; width: 10px; }
+html.dark *::-webkit-scrollbar-thumb { background: rgb(82 82 91); border-radius: 9999px; }
+html.dark *::-webkit-scrollbar-track { background: rgb(24 24 27); }
+
+/* Strong, consistent focus ring (keyboard friendly) */
+:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.6);   /* indigo-500 */
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Utility: table UI with zebra rows + row hover */
+.table-ui tbody tr:nth-child(even) { background-color: rgba(255,255,255,0.03); }
+.table-ui tbody tr:hover { background-color: rgba(255,255,255,0.06); }
+
+/* Utility: sticky table header (works inside overflow containers) */
+.sticky-header thead th {
+  position: sticky; top: 0; z-index: 1;
+  background-color: rgba(24,24,27,0.90); /* dark surface */
+  backdrop-filter: blur(2px);
+}
+
+/* Compact form fields (when you use .input-compact) */
+.input-compact { padding: 0.25rem 0.5rem !important; line-height: 1.25rem; }
+
+/* Slightly tighter card tables */
+.table-tight th, .table-tight td { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+
+/* Section spacing helper */
+.section { padding-block: 0.75rem; }

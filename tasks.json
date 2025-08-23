@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Next Dev (Webpack)",
+      "type": "shell",
+      "command": "set NEXT_WEBPACK_USE_TURBOPACK=0 && npm run dev",
+      "problemMatcher": "$tsc"
+    }
+  ]
+}

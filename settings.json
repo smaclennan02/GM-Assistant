@@ -1,0 +1,35 @@
+{
+  // Formatting
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "prettier.singleQuote": false,
+  "prettier.semi": true,
+  "prettier.plugins": ["prettier-plugin-tailwindcss"],
+
+  // TypeScript / JS
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.importModuleSpecifier": "shortest",
+  "javascript.updateImportsOnFileMove.enabled": "always",
+
+  // Tailwind
+  "tailwindCSS.experimental.classRegex": [
+    ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"] // shadcn cva()
+  ],
+
+  // Files & encodings
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": true,
+  "files.eol": "\n", // LF to avoid cross-platform diffs
+  "editor.renderWhitespace": "boundary",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // UI niceties
+  "explorer.compactFolders": false,
+  "workbench.iconTheme": "material-icon-theme",
+  "editor.minimap.enabled": false,
+
+  // Tailwind CSS language support in TSX
+  "editor.quickSuggestions": { "strings": true }
+}
