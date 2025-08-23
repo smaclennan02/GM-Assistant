@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Plus } from "lucide-react";
 import { useStorageState } from "@/storage/useStorageState";
 import { localDriver } from "@/storage/localDriver";
 import { STORAGE_KEYS } from "@/storage/keys";
@@ -8,6 +10,7 @@ import type { CharactersState, PC } from "@/types/characters";
 import { CONDITIONS, CONDITION_TIPS, CONDITION_META, type ConditionKey } from "@/lib/conditions";
 import { downloadJSON, uploadJSON } from "@/lib/io";
 
+/* ========= Types ========= */
 type Combatant = {
   id: string;
   name: string;
@@ -48,74 +51,121 @@ function d20(): number {
   return Math.floor(Math.random() * 20) + 1;
 }
 
-/* Effects Picker (icon menu) */
-function EffectsPicker({
+/* ========= Floating Effects Menu (cursor-anchored popover) ========= */
+function EffectsMenuPortal({
+  x,
+  y,
   current,
   onPick,
   onClear,
+  onClose,
 }: {
+  x: number;
+  y: number;
   current: string[];
   onPick: (k: ConditionKey) => void;
   onClear: () => void;
+  onClose: () => void;
 }) {
-  const available = CONDITIONS.filter((k) => !current.includes(k));
-  const onSelect = (e: React.MouseEvent<HTMLButtonElement>, k?: ConditionKey) => {
-    const details = (e.currentTarget.closest("details") as HTMLDetailsElement | null);
-    if (k) onPick(k);
-    if (details) details.open = false;
-  };
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [q, setQ] = useState("");
 
-  return (
-    <details className="relative">
-      <summary className="list-none">
-        <button
-          type="button"
-          className="h-6 w-6 grid place-items-center border rounded hover:bg-white/10"
-          title="Add effect"
-        >
-          +
-        </button>
-      </summary>
-      <div className="absolute right-0 z-50 mt-2 w-56 max-h-64 overflow-auto rounded border bg-neutral-950 p-2 shadow-lg">
-        {available.length > 0 ? (
-          available.map((k) => {
+  // Close on outside click / Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const onDown = (e: MouseEvent) => {
+      const node = ref.current;
+      if (node && !node.contains(e.target as Node)) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onDown);
+    };
+  }, [onClose]);
+
+  const available = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return CONDITIONS
+      .filter(k => !current.includes(k))
+      .filter(k => !s || k.toLowerCase().includes(s) || (CONDITION_TIPS[k]?.toLowerCase().includes(s)));
+  }, [current, q]);
+
+  // Keep within viewport (basic clamp)
+  const menuW = 280;
+  const menuH = 320;
+  const pad = 8;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1000;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const left = Math.max(pad, Math.min(x, vw - menuW - pad));
+  const top = Math.max(pad, Math.min(y, vh - menuH - pad));
+
+  const content = (
+    <div style={{ position: "fixed", left, top, zIndex: 9999 }}>
+      <div
+        ref={ref}
+        className="w-[280px] max-h-[320px] rounded-lg border bg-neutral-950 shadow-xl p-2"
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            autoFocus
+            className="w-full px-2 py-1 border rounded text-sm bg-transparent"
+            placeholder="Search effects…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <button
+            type="button"
+            className="px-2 py-1 border rounded text-xs"
+            title="Remove all effects"
+            onClick={() => {
+              onClear();
+              onClose();
+            }}
+          >
+            Clear
+          </button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2 overflow-auto">
+          {available.map((k) => {
             const meta = CONDITION_META[k];
             const Icon = meta?.icon;
             return (
               <button
                 key={k}
                 type="button"
-                className={`w-full flex items-center gap-2 px-2 py-1 rounded border ${meta.bg} ${meta.border} ${meta.text} hover:bg-white/10 text-sm`}
-                onClick={(e) => onSelect(e, k)}
+                className={`h-10 rounded border ${meta.bg} ${meta.border} ${meta.text} flex flex-col items-center justify-center text-[10px] leading-tight text-center px-1 hover:bg-white/10`}
                 title={CONDITION_TIPS[k]}
+                onClick={() => {
+                  onPick(k);
+                  onClose();
+                }}
               >
-                {Icon ? <Icon className="h-4 w-4" /> : <span className="h-4 w-4 grid place-items-center text-xs">?</span>}
-                <span>{k}</span>
-                <span className="ml-auto text-xs opacity-70">add</span>
+                {Icon ? <Icon className="h-4 w-4" /> : <span className="text-xs">?</span>}
+                <span className="truncate w-full">{k}</span>
               </button>
             );
-          })
-        ) : (
-          <div className="px-2 py-1 text-xs opacity-70">All effects applied</div>
-        )}
-        <div className="my-2 border-t border-neutral-800" />
-        <button
-          type="button"
-          className="w-full px-2 py-1 rounded border hover:bg-white/10 text-xs"
-          onClick={(e) => onSelect(e)}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            onClear();
-          }}
-          title="Remove all effects from this combatant"
-        >
-          Clear all effects
-        </button>
+          })}
+          {available.length === 0 && (
+            <div className="col-span-4 text-xs opacity-70 p-2 text-center">No effects available</div>
+          )}
+        </div>
+
+        <div className="mt-2 flex justify-end">
+          <button className="px-2 py-1 border rounded text-xs" onClick={onClose}>Close</button>
+        </div>
       </div>
-    </details>
+    </div>
   );
+
+  return createPortal(content, document.body);
 }
 
+/* ========= Page ========= */
 export default function InitiativePage() {
   const [enc, setEnc] = useStorageState<EncounterState>({
     key: STORAGE_KEYS.ENCOUNTERS,
@@ -359,30 +409,25 @@ export default function InitiativePage() {
     }
   }, [setEnc]);
 
-  /* QoL */
-  const autoloadRef = useRef(false);
-  useEffect(() => {
-    if (autoloadRef.current) return;
-    if (enc.combatants.length === 0 && (chars?.pcs?.length ?? 0) > 0) {
-      autoloadRef.current = true;
-      addMissingPCs();
-    }
-  }, [enc.combatants.length, chars?.pcs?.length, addMissingPCs]);
+  /* Cursor-anchored menu state */
+  const [menu, setMenu] = useState<null | {
+    x: number; y: number;
+    current: string[];
+    onPick: (k: ConditionKey) => void;
+    onClear: () => void;
+  }>(null);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
+  const openMenuAt = (ev: React.MouseEvent, current: string[], onPick: (k: ConditionKey) => void, onClear: () => void) => {
+    const menuW = 280, menuH = 320, pad = 8;
+    const { clientX, clientY } = ev;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let x = clientX, y = clientY;
+    if (x + menuW + pad > vw) x = vw - menuW - pad;
+    if (y + menuH + pad > vh) y = vh - menuH - pad;
+    setMenu({ x, y, current, onPick, onClear });
+  };
 
-      if (e.code === "BracketLeft") { e.preventDefault(); prevRound(); }
-      else if (e.code === "BracketRight") { e.preventDefault(); nextRound(); }
-      else if (e.key === "l" || e.key === "L") { e.preventDefault(); toggleLock(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [prevRound, nextRound, toggleLock]);
-
+  /* ---------- UI ---------- */
   const [npcName, setNpcName] = useState("");
 
   return (
@@ -573,11 +618,19 @@ export default function InitiativePage() {
                           );
                         })}
                       </div>
-                      <EffectsPicker
-                        current={conds}
-                        onPick={(k) => toggleCondition(c.id, k)}
-                        onClear={() => clearConditions(c.id)}
-                      />
+                      <button
+                        type="button"
+                        className="h-6 w-6 grid place-items-center border rounded hover:bg-white/10"
+                        title="Add effect"
+                        onClick={(e) => openMenuAt(
+                          e,
+                          conds,
+                          (k) => toggleCondition(c.id, k),
+                          () => clearConditions(c.id)
+                        )}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </td>
                   <td className="px-3 py-2 text-right">
@@ -598,10 +651,23 @@ export default function InitiativePage() {
           </tbody>
         </table>
       </section>
+
+      {/* Floating menu (rendered into body) */}
+      {menu ? (
+        <EffectsMenuPortal
+          x={menu.x}
+          y={menu.y}
+          current={menu.current}
+          onPick={menu.onPick}
+          onClear={menu.onClear}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
     </div>
   );
 }
 
+/** Helper: convert a PC to a combatant */
 function pcToCombatant(pc: PC): Combatant {
   return {
     id: newId(),

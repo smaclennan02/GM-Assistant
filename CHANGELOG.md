@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.13] – 2025-08-23
+### Changed
+- Tracker Effects: “+” now opens a **cursor-anchored popover** with a compact icon grid and search.
+### Improved
+- No layout shift; fixed-width Effects column preserved.
+- Click outside / Esc to close; selecting an effect auto-closes.
+
 ## [0.1.12] – 2025-08-23
 ### Added
 - **Tracker QoL**:
