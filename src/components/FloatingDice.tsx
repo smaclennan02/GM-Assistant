@@ -10,19 +10,26 @@ type Die = typeof DICE[number];
 function randInt(maxInclusive: number) {
   return 1 + Math.floor(Math.random() * maxInclusive);
 }
-
 function clampInt(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.floor(n)));
 }
-
 function fmtSign(n: number) {
   return n >= 0 ? `+${n}` : `${n}`;
 }
 
+/* ---------- Types ---------- */
+type LogColor = "neutral" | "green" | "red";
+type LogEntry = {
+  id: string;
+  title: string;    // big line, eg "20" or "23"
+  subtitle: string; // small breakdown
+  color: LogColor;
+};
+
 /* ---------- Component ---------- */
 export default function FloatingDice() {
   const [open, setOpen] = useState(false);
-  const [log, setLog] = useState<string[]>([]);
+  const [log, setLog] = useState<LogEntry[]>([]);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Close on outside click / Esc
@@ -40,15 +47,26 @@ export default function FloatingDice() {
     };
   }, []);
 
-  /* ---------- Quick Rolls ---------- */
-  const rollSingle = (sides: Die) => {
-    const v = randInt(sides);
-    pushLog(`d${sides} → ${v}`);
+  const pushLog = (e: LogEntry) => {
+    setLog((l) => [e, ...l].slice(0, 12));
   };
+  const newId = () =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+
+  /* ---------- d20 row (with Adv/Dis + mod) ---------- */
+  const [d20Mod, setD20Mod] = useState(0);
 
   const rollD20 = (mod = 0) => {
-    const v = randInt(20) + mod;
-    pushLog(`d20${mod ? ` ${fmtSign(mod)}` : ""} → ${v}`);
+    const base = randInt(20);
+    const total = base + mod;
+    pushLog({
+      id: newId(),
+      title: String(total),
+      subtitle: `d20${mod ? ` ${fmtSign(mod)}` : ""} • roll ${base}`,
+      color: "neutral",
+    });
   };
 
   const rollAdv = (mod = 0) => {
@@ -56,9 +74,12 @@ export default function FloatingDice() {
     const b = randInt(20);
     const keep = Math.max(a, b);
     const total = keep + mod;
-    pushLog(
-      `d20 adv${mod ? ` ${fmtSign(mod)}` : ""} → ${total} (rolls: ${a}, ${b}; keep ${keep})`
-    );
+    pushLog({
+      id: newId(),
+      title: String(total),
+      subtitle: `d20 ADV${mod ? ` ${fmtSign(mod)}` : ""} • rolls ${a}, ${b} • kept ${keep}`,
+      color: "green",
+    });
   };
 
   const rollDis = (mod = 0) => {
@@ -66,16 +87,30 @@ export default function FloatingDice() {
     const b = randInt(20);
     const keep = Math.min(a, b);
     const total = keep + mod;
-    pushLog(
-      `d20 dis${mod ? ` ${fmtSign(mod)}` : ""} → ${total} (rolls: ${a}, ${b}; keep ${keep})`
-    );
+    pushLog({
+      id: newId(),
+      title: String(total),
+      subtitle: `d20 DIS${mod ? ` ${fmtSign(mod)}` : ""} • rolls ${a}, ${b} • kept ${keep}`,
+      color: "red",
+    });
+  };
+
+  /* ---------- Quick singles ---------- */
+  const rollSingle = (sides: Die) => {
+    const v = randInt(sides);
+    pushLog({
+      id: newId(),
+      title: String(v),
+      subtitle: `d${sides}`,
+      color: "neutral",
+    });
   };
 
   /* ---------- Custom Roller ---------- */
-  const [n, setN] = useState(2);      // count
-  const [s, setS] = useState(6);      // sides
-  const [mod, setMod] = useState(0);  // modifier
-  const [drop, setDrop] = useState(0);// drop lowest K
+  const [n, setN] = useState(4);
+  const [s, setS] = useState(6);
+  const [mod, setMod] = useState(0);
+  const [drop, setDrop] = useState(1); // drop lowest 1 by default (4d6-L)
 
   const doCustomRoll = () => {
     const count = clampInt(n, 1, 100);
@@ -93,200 +128,197 @@ export default function FloatingDice() {
       `${count}d${sides}` +
       (dropCount ? ` drop${dropCount}` : "") +
       (modClamped ? ` ${fmtSign(modClamped)}` : "");
-    const details =
-      `rolls: [${rolls.join(", ")}]` +
-      (dropCount ? `; kept: [${kept.join(", ")}]` : "");
-    pushLog(`${expr} → ${total} (${details})`);
+
+    pushLog({
+      id: newId(),
+      title: String(total),
+      subtitle: `${expr} • rolls [${rolls.join(", ")}]${dropCount ? ` • kept [${kept.join(", ")}]` : ""}`,
+      color: "neutral",
+    });
   };
 
-  /* ---------- Presets ---------- */
-  const preset2d6 = () => runPreset(2, 6, 0, 0);
-  const preset3d6 = () => runPreset(3, 6, 0, 0);
-  const preset4d6L = () => runPreset(4, 6, 0, 1); // drop lowest 1
-
-  function runPreset(count: number, sides: number, modP: number, dropP: number) {
-    setN(count); setS(sides); setMod(modP); setDrop(dropP);
-    // Immediately roll with these values:
-    const rolls: number[] = Array.from({ length: count }, () => randInt(sides));
-    const sorted = [...rolls].sort((a, b) => a - b);
-    const kept = sorted.slice(dropP);
-    const sum = kept.reduce((t, x) => t + x, 0);
-    const total = sum + modP;
-    const expr =
-      `${count}d${sides}` +
-      (dropP ? ` drop${dropP}` : "") +
-      (modP ? ` ${fmtSign(modP)}` : "");
-    const details =
-      `rolls: [${rolls.join(", ")}]` +
-      (dropP ? `; kept: [${kept.join(", ")}]` : "");
-    pushLog(`${expr} → ${total} (${details})`);
-  }
-
-  /* ---------- Log helper ---------- */
-  function pushLog(line: string) {
-    setLog((l) => [line, ...l].slice(0, 12));
-  }
+  const preset2d6 = () => { setN(2); setS(6); setMod(0); setDrop(0); doCustomRoll(); };
+  const preset3d6 = () => { setN(3); setS(6); setMod(0); setDrop(0); doCustomRoll(); };
+  const preset4d6L = () => { setN(4); setS(6); setMod(0); setDrop(1); doCustomRoll(); };
 
   /* ---------- Render ---------- */
   return (
-    <div ref={rootRef} className="fixed z-[9998] bottom-4 right-4">
-      {/* BIG toggle button (same button opens/closes) */}
+    <div ref={rootRef} className="fixed z-[9998] bottom-6 right-6">
+      {/* BIGGER dice button; same button toggles open/close */}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         title={open ? "Close dice" : "Open dice"}
-        className="relative grid place-items-center rounded-full border bg-neutral-950/80 hover:bg-neutral-900/90 shadow-lg w-16 h-16"
+        className="relative grid place-items-center rounded-full border bg-neutral-950/90 hover:bg-neutral-900/95 shadow-xl w-18 h-18"
+        style={{ width: 72, height: 72 }} // bigger than w-16 h-16
       >
-        {Dice6 ? <Dice6 className="w-8 h-8" /> : <span className="text-2xl">🎲</span>}
+        {Dice6 ? <Dice6 className="w-10 h-10" /> : <span className="text-3xl">🎲</span>}
       </button>
 
-      {/* Panel that unfolds from the button (CSS transitions only) */}
+      {/* Unfolding panel — FIXED SIZE so it never jumps */}
       <div
         className={[
-          "absolute bottom-[76px] right-0 w-[300px] rounded-xl border bg-neutral-950/95 shadow-2xl backdrop-blur p-3",
+          "absolute right-0",
+          "rounded-2xl border bg-neutral-950/95 shadow-2xl backdrop-blur",
           "transform-gpu origin-bottom-right transition-all duration-200 ease-out",
-          open ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-2 pointer-events-none",
+          open ? "opacity-100 scale-100 translate-y-0 pointer-events-auto" : "opacity-0 scale-95 translate-y-2 pointer-events-none",
         ].join(" ")}
+        style={{
+          bottom: 84,  // sits just above the big button
+          width: 380,  // wider
+          height: 500, // fixed height: no jitter when history fills
+        }}
       >
-        {/* D20 row: normal / adv / dis with optional mod */}
-        <div className="flex items-center gap-2">
-          <div className="text-xs opacity-70 w-10">d20</div>
-          <button
-            className="px-2 py-1 border rounded text-xs hover:bg-white/10"
-            onClick={() => rollD20(0)}
-            title="Roll d20"
-          >Roll</button>
-          <button
-            className="px-2 py-1 border rounded text-xs hover:bg-white/10"
-            onClick={() => rollAdv(0)}
-            title="Roll d20 with advantage"
-          >Adv</button>
-          <button
-            className="px-2 py-1 border rounded text-xs hover:bg-white/10"
-            onClick={() => rollDis(0)}
-            title="Roll d20 with disadvantage"
-          >Dis</button>
-          <div className="ml-auto flex items-center gap-1">
-            <label className="text-xs opacity-70">mod</label>
+        <div className="h-full flex flex-col p-4 gap-3">
+          {/* d20 Row: bigger, color-coded */}
+          <div className="flex items-center gap-3">
+            <div className="text-sm opacity-70 w-12">d20</div>
+
+            <button
+              className="px-3 py-2 rounded text-sm border bg-sky-500/10 border-sky-500/30 text-sky-300 hover:bg-sky-500/20"
+              onClick={() => rollD20(d20Mod)}
+              title={`Roll d20${d20Mod ? ` ${fmtSign(d20Mod)}` : ""}`}
+            >
+              Roll
+            </button>
+
+            <button
+              className="px-3 py-2 rounded text-sm border bg-green-500/10 border-green-500/30 text-green-300 hover:bg-green-500/20"
+              onClick={() => rollAdv(d20Mod)}
+              title={`Roll d20 with Advantage${d20Mod ? ` ${fmtSign(d20Mod)}` : ""}`}
+            >
+              Advantage
+            </button>
+
+            <button
+              className="px-3 py-2 rounded text-sm border bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20"
+              onClick={() => rollDis(d20Mod)}
+              title={`Roll d20 with Disadvantage${d20Mod ? ` ${fmtSign(d20Mod)}` : ""}`}
+            >
+              Disadvantage
+            </button>
+
+            <div className="ml-auto flex items-center gap-2">
+              <label className="text-xs opacity-70">mod</label>
+              <input
+                type="number"
+                className="w-16 px-2 py-2 border rounded text-sm bg-transparent"
+                value={d20Mod}
+                onChange={(e) => setD20Mod(Number(e.target.value || 0))}
+                onKeyDown={(e) => e.stopPropagation()}
+                title="Modifier applied to d20 rolls"
+              />
+            </div>
+          </div>
+
+          {/* Presets */}
+          <div className="grid grid-cols-3 gap-2">
+            <button className="px-3 py-2 rounded text-sm border hover:bg-white/10" onClick={preset2d6} title="2d6 total">2d6</button>
+            <button className="px-3 py-2 rounded text-sm border hover:bg-white/10" onClick={preset3d6} title="3d6 total">3d6</button>
+            <button className="px-3 py-2 rounded text-sm border hover:bg-white/10" onClick={preset4d6L} title="4d6 drop lowest">4d6-L</button>
+          </div>
+
+          {/* Standard single dice */}
+          <div className="grid grid-cols-7 gap-2">
+            {DICE.map((sides) => (
+              <button
+                key={sides}
+                onClick={() => rollSingle(sides)}
+                className="px-3 py-2 rounded text-sm border hover:bg-white/10"
+                title={`Roll d${sides}`}
+              >
+                d{sides}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom roller (bigger) */}
+          <div className="grid grid-cols-12 gap-2 items-center">
+            <div className="col-span-12 text-xs opacity-70">Custom</div>
+
+            <label className="text-xs opacity-70 col-span-2 self-center">#</label>
             <input
               type="number"
-              className="w-14 px-2 py-1 border rounded text-xs bg-transparent"
-              defaultValue={0}
-              onChange={(e) => {
-                const m = Number(e.target.value || 0);
-                // Update the three buttons to use current mod via closures:
-                // We’ll just rebind handlers by reading value at click time:
-                (rollD20 as any).mod = m;
-                (rollAdv as any).mod = m;
-                (rollDis as any).mod = m;
-              }}
+              className="col-span-2 px-2 py-2 border rounded text-sm bg-transparent"
+              value={n}
+              onChange={(e) => setN(Number(e.target.value || 1))}
               onKeyDown={(e) => e.stopPropagation()}
-              title="Default mod applied to d20 Roll/Adv/Dis"
+              min={1}
+              max={100}
+              title="Number of dice"
             />
-            <button
-              className="px-2 py-1 border rounded text-xs hover:bg-white/10"
-              title="Roll d20 with current mod"
-              onClick={() => rollD20((rollD20 as any).mod ?? 0)}
-            >Roll+mod</button>
-          </div>
-        </div>
 
-        {/* Quick presets */}
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <button className="px-2 py-1 border rounded text-xs hover:bg-white/10" onClick={preset2d6} title="2d6 total">2d6</button>
-          <button className="px-2 py-1 border rounded text-xs hover:bg-white/10" onClick={preset3d6} title="3d6 total">3d6</button>
-          <button className="px-2 py-1 border rounded text-xs hover:bg-white/10" onClick={preset4d6L} title="4d6 drop lowest">4d6-L</button>
-        </div>
+            <label className="text-xs opacity-70 col-span-2 self-center">d</label>
+            <input
+              type="number"
+              className="col-span-2 px-2 py-2 border rounded text-sm bg-transparent"
+              value={s}
+              onChange={(e) => setS(Number(e.target.value || 2))}
+              onKeyDown={(e) => e.stopPropagation()}
+              min={2}
+              max={1000}
+              title="Sides per die"
+            />
 
-        {/* Standard single dice row */}
-        <div className="mt-3 grid grid-cols-7 gap-1">
-          {DICE.map((sides) => (
+            <label className="text-xs opacity-70 col-span-2 self-center">mod</label>
+            <input
+              type="number"
+              className="col-span-2 px-2 py-2 border rounded text-sm bg-transparent"
+              value={mod}
+              onChange={(e) => setMod(Number(e.target.value || 0))}
+              onKeyDown={(e) => e.stopPropagation()}
+              min={-999}
+              max={999}
+              title="Flat modifier"
+            />
+
+            <label className="text-xs opacity-70 col-span-3 self-center">drop</label>
+            <input
+              type="number"
+              className="col-span-3 px-2 py-2 border rounded text-sm bg-transparent"
+              value={drop}
+              onChange={(e) => setDrop(Number(e.target.value || 0))}
+              onKeyDown={(e) => e.stopPropagation()}
+              min={0}
+              max={Math.max(0, n - 1)}
+              title="Drop lowest K dice"
+            />
+
+            <div className="col-span-6" />
             <button
-              key={sides}
-              onClick={() => rollSingle(sides)}
-              className="px-2 py-1 border rounded text-xs hover:bg-white/10"
-              title={`Roll d${sides}`}
+              className="col-span-6 px-3 py-2 rounded text-sm border hover:bg-white/10"
+              onClick={doCustomRoll}
+              title="Roll the custom expression"
             >
-              d{sides}
+              Roll {n}d{s}{drop ? ` drop${drop}` : ""}{mod ? ` ${fmtSign(mod)}` : ""}
             </button>
-          ))}
-        </div>
+          </div>
 
-        {/* Custom roller */}
-        <div className="mt-3 grid grid-cols-12 gap-2 items-center">
-          <div className="col-span-12 text-xs opacity-70">Custom</div>
-
-          <label className="text-xs opacity-70 col-span-2 self-center">#</label>
-          <input
-            type="number"
-            className="col-span-2 px-2 py-1 border rounded text-xs bg-transparent"
-            value={n}
-            onChange={(e) => setN(Number(e.target.value || 1))}
-            onKeyDown={(e) => e.stopPropagation()}
-            min={1}
-            max={100}
-            title="Number of dice"
-          />
-
-          <label className="text-xs opacity-70 col-span-2 self-center">d</label>
-          <input
-            type="number"
-            className="col-span-2 px-2 py-1 border rounded text-xs bg-transparent"
-            value={s}
-            onChange={(e) => setS(Number(e.target.value || 2))}
-            onKeyDown={(e) => e.stopPropagation()}
-            min={2}
-            max={1000}
-            title="Sides per die"
-          />
-
-          <label className="text-xs opacity-70 col-span-2 self-center">mod</label>
-          <input
-            type="number"
-            className="col-span-2 px-2 py-1 border rounded text-xs bg-transparent"
-            value={mod}
-            onChange={(e) => setMod(Number(e.target.value || 0))}
-            onKeyDown={(e) => e.stopPropagation()}
-            min={-999}
-            max={999}
-            title="Flat modifier"
-          />
-
-          <label className="text-xs opacity-70 col-span-3 self-center">drop</label>
-          <input
-            type="number"
-            className="col-span-3 px-2 py-1 border rounded text-xs bg-transparent"
-            value={drop}
-            onChange={(e) => setDrop(Number(e.target.value || 0))}
-            onKeyDown={(e) => e.stopPropagation()}
-            min={0}
-            max={Math.max(0, n - 1)}
-            title="Drop lowest K dice"
-          />
-
-          <div className="col-span-6" />
-          <button
-            className="col-span-6 px-2 py-1 border rounded text-xs hover:bg-white/10"
-            onClick={doCustomRoll}
-            title="Roll the custom expression"
-          >
-            Roll {n}d{s}{drop ? ` drop${drop}` : ""}{mod ? ` ${fmtSign(mod)}` : ""}
-          </button>
-        </div>
-
-        {/* Log */}
-        <div className="mt-3 text-xs opacity-70">Recent</div>
-        <div className="mt-1 grid gap-1 max-h-36 overflow-auto pr-1">
-          {log.length === 0 ? (
-            <div className="text-xs opacity-60">No rolls yet.</div>
-          ) : (
-            log.map((e, idx) => (
-              <div key={idx} className="text-sm border rounded px-2 py-1 bg-white/5">
-                {e}
+          {/* History: fixed space, scroll inside; entries are big & wrap */}
+          <div className="text-xs opacity-70">History</div>
+          <div className="flex-1 min-h-[140px] max-h-[180px] overflow-auto pr-1">
+            {log.length === 0 ? (
+              <div className="text-xs opacity-60">No rolls yet.</div>
+            ) : (
+              <div className="grid gap-2">
+                {log.map((e) => (
+                  <div
+                    key={e.id}
+                    className={[
+                      "rounded-lg border p-2 bg-white/5",
+                      e.color === "green" ? "border-green-500/40" : e.color === "red" ? "border-red-500/40" : "border-white/20",
+                    ].join(" ")}
+                  >
+                    <div className="text-xl font-bold leading-none">{e.title}</div>
+                    <div className="text-xs opacity-80 mt-1 whitespace-normal break-words">
+                      {e.subtitle}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
