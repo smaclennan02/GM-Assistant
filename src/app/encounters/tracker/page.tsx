@@ -19,6 +19,9 @@ import {
 } from "@/lib/conditions";
 
 /* ========= Types ========= */
+type TimedCondition = { key: ConditionKey; rounds: number };
+type CondEntry = ConditionKey | TimedCondition;
+
 type Combatant = {
   id: string;
   name: string;
@@ -28,7 +31,7 @@ type Combatant = {
   isPC?: boolean;
   pcId?: string;
   tags?: string[];
-  conditions?: ConditionKey[];
+  conditions?: CondEntry[];
   kind?: "pc" | "npc" | "monster";
 };
 
@@ -86,6 +89,53 @@ function pcToCombatant(pc: PC): Combatant {
   };
 }
 
+/* ---- Condition utils ---- */
+function isTimed(x: CondEntry): x is TimedCondition {
+  return typeof x === "object" && x !== null && "key" in x && "rounds" in x;
+}
+function condKeyOf(x: CondEntry): ConditionKey {
+  return (isTimed(x) ? x.key : x) as ConditionKey;
+}
+
+/** Upsert a condition by key. If rounds provided, set/replace as timed; if not, set to untimed. */
+function upsertCondition(list: CondEntry[] | undefined, key: ConditionKey, rounds?: number): CondEntry[] {
+  const arr = [...(list || [])];
+  const idx = arr.findIndex((e) => condKeyOf(e) === key);
+  if (rounds && rounds > 0) {
+    const entry: TimedCondition = { key, rounds };
+    if (idx >= 0) arr[idx] = entry;
+    else arr.push(entry);
+  } else {
+    // Untimed – replace any existing timed/untimed with plain key
+    if (idx >= 0) arr[idx] = key;
+    else arr.push(key);
+  }
+  return arr;
+}
+
+/** Remove a condition by key (removes any timed/untimed variant). */
+function removeConditionByKey(list: CondEntry[] | undefined, key: ConditionKey): CondEntry[] {
+  return (list || []).filter((e) => condKeyOf(e) !== key);
+}
+
+/** Tick conditions for a given combatant ID: decrement timed; remove at 0; untimed unchanged. */
+function tickConditionsForId(list: Combatant[], id: string): Combatant[] {
+  return list.map((c) => {
+    if (c.id !== id) return c;
+    const next: CondEntry[] = [];
+    for (const e of c.conditions || []) {
+      if (isTimed(e)) {
+        const r = e.rounds - 1;
+        if (r > 0) next.push({ key: e.key, rounds: r });
+        // else drop (auto-remove)
+      } else {
+        next.push(e); // untimed stays
+      }
+    }
+    return { ...c, conditions: next };
+  });
+}
+
 /* ========= Floating Effects Menu (portal; opens at cursor) ========= */
 function EffectsMenu({
   x,
@@ -96,16 +146,18 @@ function EffectsMenu({
   x: number;
   y: number;
   onClose: () => void;
-  onPick: (key: ConditionKey) => void;
+  onPick: (key: ConditionKey, rounds?: number) => void;
 }) {
   // Clamp within viewport to avoid overflow
-  const width = 360;
-  const height = 240;
+  const width = 380;
+  const height = 280;
   const pad = 12;
   const vw = typeof window !== "undefined" ? window.innerWidth : width;
   const vh = typeof window !== "undefined" ? window.innerHeight : height;
   const left = Math.max(pad, Math.min(x, vw - width - pad));
   const top = Math.max(pad, Math.min(y, vh - height - pad));
+
+  const [rounds, setRounds] = useState<string>(""); // optional rounds
 
   return createPortal(
     <div className="fixed inset-0 z-[9999]" onClick={onClose}>
@@ -114,6 +166,20 @@ function EffectsMenu({
         style={{ left, top, width, maxHeight: height }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Optional duration row */}
+        <div className="flex items-center gap-2 mb-2">
+          <label className="text-xs opacity-80 whitespace-nowrap">Rounds (optional)</label>
+          <input
+            type="number"
+            min={1}
+            placeholder="e.g. 10"
+            value={rounds}
+            onChange={(e) => setRounds(e.target.value)}
+            className="w-24 px-2 py-1 border rounded bg-transparent text-sm"
+          />
+          <span className="text-xs opacity-60">Click a condition to add.</span>
+        </div>
+
         <div className="grid grid-cols-3 gap-1">
           {CONDITIONS.map((c) => {
             const meta = CONDITION_META[c as ConditionKey];
@@ -122,17 +188,13 @@ function EffectsMenu({
               <button
                 key={c}
                 className="flex items-center gap-2 px-2 py-2 border rounded hover:bg-white/10 text-xs"
-                onClick={() => onPick(c as ConditionKey)}
+                onClick={() => {
+                  const n = Number(rounds);
+                  onPick(c as ConditionKey, Number.isFinite(n) && n > 0 ? n : undefined);
+                }}
                 title={c}
               >
-                <span
-                  className={[
-                    "inline-flex items-center justify-center h-5 w-5 rounded-full border",
-                    meta.bg,
-                    meta.border,
-                    meta.text,
-                  ].join(" ")}
-                >
+                <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full border ${meta.bg} ${meta.border} ${meta.text}`}>
                   <Icon className="h-3 w-3" />
                 </span>
                 <span className="truncate">{c}</span>
@@ -180,19 +242,24 @@ export default function InitiativePage() {
     });
   }, [enc.combatants, enc.orderLocked]);
 
-  /* ===== Turn / Round controls ===== */
+  /* ===== Turn / Round controls (tick when a creature becomes active) ===== */
   function firstEligible(list: Combatant[]) {
     return list.find((c) => c.init !== null) ?? list[0] ?? null;
   }
 
   const startTurn = useCallback(() => {
+    if (sorted.length === 0) return;
     const first = firstEligible(sorted);
     if (!first) return;
-    setEnc((e) => ({ ...e, activeId: first.id, updatedAt: Date.now() }));
+    setEnc((e) => {
+      const withTick = tickConditionsForId(e.combatants, first.id);
+      return { ...e, combatants: withTick, activeId: first.id, updatedAt: Date.now() };
+    });
   }, [sorted, setEnc]);
 
   const nextTurn = useCallback(() => {
     if (sorted.length === 0) return;
+    // If nothing selected yet, start
     if (!enc.activeId) return startTurn();
 
     const idx = Math.max(0, sorted.findIndex((c) => c.id === enc.activeId));
@@ -200,16 +267,21 @@ export default function InitiativePage() {
     const wrapped = nextIndex === 0;
     const nextC = sorted[nextIndex];
 
-    setEnc((e) => ({
-      ...e,
-      activeId: nextC?.id ?? null,
-      round: wrapped ? (e.round ?? 1) + 1 : e.round,
-      updatedAt: Date.now(),
-    }));
+    setEnc((e) => {
+      const withTick = nextC ? tickConditionsForId(e.combatants, nextC.id) : e.combatants;
+      return {
+        ...e,
+        combatants: withTick,
+        activeId: nextC?.id ?? null,
+        round: wrapped ? (e.round ?? 1) + 1 : e.round,
+        updatedAt: Date.now(),
+      };
+    });
   }, [enc.activeId, sorted, setEnc, startTurn]);
 
   const prevTurn = useCallback(() => {
     if (sorted.length === 0) return;
+    // If nothing selected yet, start
     if (!enc.activeId) return startTurn();
 
     const idx = Math.max(0, sorted.findIndex((c) => c.id === enc.activeId));
@@ -217,16 +289,23 @@ export default function InitiativePage() {
     const wrappedBack = prevIndex === sorted.length - 1;
     const prevC = sorted[prevIndex];
 
-    setEnc((e) => ({
-      ...e,
-      activeId: prevC?.id ?? null,
-      round: Math.max(1, wrappedBack ? (e.round ?? 1) - 1 : (e.round ?? 1)),
-      updatedAt: Date.now(),
-    }));
+    setEnc((e) => {
+      const withTick = prevC ? tickConditionsForId(e.combatants, prevC.id) : e.combatants;
+      return {
+        ...e,
+        combatants: withTick,
+        activeId: prevC?.id ?? null,
+        round: Math.max(1, wrappedBack ? (e.round ?? 1) - 1 : (e.round ?? 1)),
+        updatedAt: Date.now(),
+      };
+    });
   }, [enc.activeId, sorted, setEnc, startTurn]);
 
   function setActive(id: string) {
-    setEnc((e) => ({ ...e, activeId: id, updatedAt: Date.now() }));
+    setEnc((e) => {
+      const withTick = tickConditionsForId(e.combatants, id);
+      return { ...e, combatants: withTick, activeId: id, updatedAt: Date.now() };
+    });
   }
 
   /* ===== Basic mutations ===== */
@@ -265,9 +344,12 @@ export default function InitiativePage() {
   };
 
   /* ===== Adders ===== */
+  const [quickNPCName, setQuickNPCNameLocal] = useState(quickNPCName);
+  function setQuickNPCName(v: string) { setQuickNPCNameLocal(v); }
+
   const addNPC = useCallback(
     (name: string) => {
-      const nm = name.trim() || "NPC";
+      const nm = (name || "").trim() || "NPC";
       setEnc((e) => ({
         ...e,
         combatants: [
@@ -334,27 +416,20 @@ export default function InitiativePage() {
   }, [setEnc]);
 
   /* ===== Condition mutations ===== */
-  function addCondition(id: string, condKey: ConditionKey) {
+  function addCondition(id: string, key: ConditionKey, rounds?: number) {
     setEnc((e) => ({
       ...e,
       combatants: e.combatants.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              conditions: Array.from(new Set([...(x.conditions || []), condKey])),
-            }
-          : x
+        x.id === id ? { ...x, conditions: upsertCondition(x.conditions, key, rounds) } : x
       ),
       updatedAt: Date.now(),
     }));
   }
-  function removeCondition(id: string, condKey: ConditionKey) {
+  function removeCondition(id: string, key: ConditionKey) {
     setEnc((e) => ({
       ...e,
       combatants: e.combatants.map((x) =>
-        x.id === id
-          ? { ...x, conditions: (x.conditions || []).filter((c) => c !== condKey) as ConditionKey[] }
-          : x
+        x.id === id ? { ...x, conditions: removeConditionByKey(x.conditions, key) } : x
       ),
       updatedAt: Date.now(),
     }));
@@ -377,7 +452,7 @@ export default function InitiativePage() {
           <button
             className="px-3 py-2 border rounded text-sm hover:bg-white/10"
             onClick={startTurn}
-            title="Start on the first combatant"
+            title="Start on the first combatant (also ticks their timed effects)"
           >
             <Play className="inline-block h-4 w-4 mr-1" />
             Start
@@ -385,14 +460,14 @@ export default function InitiativePage() {
           <button
             className="px-3 py-2 border rounded text-sm hover:bg-white/10"
             onClick={prevTurn}
-            title="Previous turn"
+            title="Previous turn (ticks new active)"
           >
             <ChevronLeft className="inline-block h-4 w-4" />
           </button>
           <button
             className="px-3 py-2 border rounded text-sm hover:bg-white/10"
             onClick={nextTurn}
-            title="Next turn"
+            title="Next turn (ticks new active)"
           >
             <ChevronRight className="inline-block h-4 w-4" />
           </button>
@@ -459,7 +534,7 @@ export default function InitiativePage() {
               <th className="px-3 py-2 w-24">Init</th>
               <th className="px-3 py-2 w-28">HP</th>
               <th className="px-3 py-2 w-24">AC</th>
-              <th className="px-3 py-2 w-[220px]">Effects</th>
+              <th className="px-3 py-2 w-[260px]">Effects</th>
               <th className="px-3 py-2 w-20">Actions</th>
             </tr>
           </thead>
@@ -479,7 +554,8 @@ export default function InitiativePage() {
                 <tr
                   key={c.id}
                   className={
-                    "border-t " + (active ? "bg-amber-500/10 outline outline-1 outline-amber-400/30" : "")
+                    "border-t " +
+                    (active ? "bg-amber-500/10 outline outline-1 outline-amber-400/30" : "")
                   }
                 >
                   {/* Turn marker */}
@@ -490,7 +566,7 @@ export default function InitiativePage() {
                         (active ? "bg-amber-500/20 border-amber-400/40" : "hover:bg-white/10")
                       }
                       onClick={() => setActive(c.id)}
-                      title={active ? "Active turn" : "Make active"}
+                      title={active ? "Active turn (ticks)" : "Make active (ticks)"}
                       aria-label={active ? "Active turn" : "Make active"}
                     >
                       {active ? "▶" : "•"}
@@ -562,15 +638,21 @@ export default function InitiativePage() {
                     <div className="flex items-center gap-2">
                       {/* Active effects as small chips (icon only; tooltip text; click to remove) */}
                       <div className="flex items-center gap-1 flex-wrap">
-                        {(c.conditions || []).map((key) => {
+                        {(c.conditions || []).map((entry, i) => {
+                          const key = condKeyOf(entry);
                           const meta = CONDITION_META[key];
                           const Icon = meta.icon;
                           const tip = CONDITION_TIPS[key];
+                          const rounds = isTimed(entry) ? entry.rounds : undefined;
                           return (
                             <button
-                              key={key}
+                              key={`${key}-${i}`}
                               className={`px-1.5 py-1 border rounded text-xs ${meta.bg} ${meta.border} ${meta.text}`}
-                              title={`${key} — ${tip} (click to remove)`}
+                              title={
+                                rounds
+                                  ? `${key} — ${tip} (${rounds} rnd${rounds === 1 ? "" : "s"} remaining) • click to remove`
+                                  : `${key} — ${tip} • click to remove`
+                              }
                               onClick={() => removeCondition(c.id, key)}
                             >
                               <Icon className="h-3.5 w-3.5" />
@@ -643,9 +725,9 @@ export default function InitiativePage() {
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
-          onPick={(key) => {
+          onPick={(key, rounds) => {
             if (!menu?.id) return;
-            addCondition(menu.id, key);
+            addCondition(menu.id, key, rounds);
           }}
         />
       )}

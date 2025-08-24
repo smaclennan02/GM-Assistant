@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.21] – 2025-08-24
+### Added
+- Tracker: Effects can have **round durations**; add via “+” menu with optional rounds.
+- Tracker: **Auto-tick** timed effects when a creature becomes active (Start / Next / Prev). Auto-removes at 0.
+
+### Compatibility
+- Existing encounters still work: untimed effects remain simple keys.
+- Adding a timed version of an existing effect **replaces** the untimed one for that row (and vice versa), avoiding duplicates.
+
 ## [0.1.20] – 2025-08-24
 ### Changed
 - Tracker: Effects now use the **exact** icons & colors from `lib/conditions`.
