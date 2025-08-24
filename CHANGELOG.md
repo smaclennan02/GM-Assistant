@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.20] – 2025-08-24
+### Changed
+- Tracker: Effects now use the **exact** icons & colors from `lib/conditions`.
+- Tracker: “+” opens a floating **cursor-anchored** menu (portal), no table squish.
+- Tracker: Effect chips are **icon-only** with tooltips; click to remove.
+
+### Fixed
+- Tracker: **Load PCs** merges by `pcId` to prevent duplicates.
+
 ## [0.1.18] – 2025-08-24
 ### Added
 - Monsters page: **Add N copies** with **auto-numbering** (Goblin #1…#N).
