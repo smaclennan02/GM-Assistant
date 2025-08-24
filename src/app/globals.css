@@ -263,3 +263,27 @@ textarea:focus:not(:focus-visible) {
 
 /* Section spacing helper */
 .section { padding-block: 0.75rem; }
+
+/* Make every pressable element feel clickable (site-wide) */
+@layer base {
+  /* Buttons & elements acting like buttons */
+  button:not([disabled]),
+  [role="button"] {
+    @apply cursor-pointer transition-colors duration-150;
+  }
+
+  button:not([disabled]):hover,
+  [role="button"]:hover {
+    @apply bg-white/10;
+  }
+
+  button:not([disabled]):active,
+  [role="button"]:active {
+    @apply bg-white/15;
+  }
+
+  button:focus-visible,
+  [role="button"]:focus-visible {
+    @apply outline-none ring-2 ring-amber-500/60;
+  }
+}

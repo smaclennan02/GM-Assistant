@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +10,12 @@ import { toast } from "sonner";
 
 import { useStorageState } from "@/storage/useStorageState";
 import { localDriver } from "@/storage/localDriver";
-import { STORAGE_KEYS } from "@/storage/keys";
 
 import type { CharactersState, PC as PCBase } from "@/types/characters";
 import { downloadJSON, uploadJSON } from "@/lib/io";
+
+import { STORAGE_KEYS } from "@/storage/keys";
+
 
 /* ---------------- types & helpers ---------------- */
 
@@ -147,6 +151,8 @@ function PCsPanel({
   setPCs: (updater: (prev: PCX[]) => PCX[]) => void;
 }) {
   const [q, setQ] = useState("");
+
+
 
   function addPC() {
     setPCs((p) => [

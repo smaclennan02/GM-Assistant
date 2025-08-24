@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2025-08-25
+### Added
+- **Slide-over Details Drawer** for combatant info (opens from the right, closes on backdrop or Esc). Zero table reflow and plenty of space for monster stat blocks and PC details.
+- **Active Info state** on rows (Info button shows active background when that combatant is open).
+
+### Changed
+- **Encounter table density & layout**: tighter column widths (Name/Init/HP/AC/Effects), merged *Info*+*Remove* into a single **Actions** column, and flexible Name input so the **Actions** stay visible without horizontal scrolling.
+- **Responsive layout**: table gets more room at smaller widths (sidebar stacks later), reducing the chance of horizontal scroll.
+- **Consistent affordances**: all pressable controls now use pointer cursor + hover state (including chips, Info, and action buttons).
+
+### Fixed
+- Invalid hook call caused by a misplaced `useState` (moved `drawerId` inside the component).
+- Stray reference to `drawerId` inside the Effects menu (menu restored to a simple close button).
+- Residual links: removed any remaining Tracker/Builder/Monsters links from the Suite page UI (legacy routes still redirect to the Suite).
+
+### Notes
+- The Encounter Suite remains the single destination for running combat: initiative tracking, effects, Monster Manual (search + Add N + optional Roll HP), and details—now via a non-intrusive drawer.
+
+## [0.1.22] - 2025-08-24
+### Added
+- **Encounter Suite** consolidation: one-page flow (tracker + Monster Manual + right-side Info panel), PC sync (Load PCs add/update/prune).
+### Changed
+- Nav now points to Encounter Suite as the single Encounters destination; old routes redirect to it.
+### Fixed
+- Ghost PCs (e.g., “Ajax”) pruned during sync to match Characters tab.
+
+
+
 ## [0.1.21] – 2025-08-24
 ### Added
 - Tracker: Effects can have **round durations**; add via “+” menu with optional rounds.

@@ -5,12 +5,14 @@ import { usePathname } from "next/navigation";
 
 export default function Nav() {
   const pathname = usePathname();
-  const items = [
-    { href: "/encounters", label: "Encounters", Icon: Sword },
-    { href: "/characters", label: "Characters", Icon: Users },
-    { href: "/campaign", label: "Campaign", Icon: Map },
-    { href: "/resources", label: "Resources", Icon: BookOpen },
-  ];
+
+const items = [
+  { href: "/encounters/suite", label: "Encounter Suite", Icon: Sword },
+  { href: "/characters",       label: "Characters",       Icon: Users },
+  { href: "/campaign",         label: "Campaign",         Icon: Map },
+  { href: "/resources",        label: "Resources",        Icon: BookOpen },
+];
+
   return (
     <nav className="sticky top-0 z-50 backdrop-blur bg-parchment/70 border-b">
       <div className="mx-auto max-w-6xl px-4 py-3 flex gap-2">
@@ -24,7 +26,7 @@ export default function Nav() {
                 active ? "bg-wood/10" : "hover:bg-wood/10"
               }`}
             >
-              <Icon className="size-4" />
+              {Icon && <Icon className="size-4" />}
               <span className="font-medium">{label}</span>
             </Link>
           );
