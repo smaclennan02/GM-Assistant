@@ -1,6 +1,46 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+# Changelog
+
+All notable changes to this project will be documented in this file.
+This project adheres to [Semantic Versioning](https://semver.org) and the format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+### Planned
+- v0.6.0 — Campaign Hub deep linking (`/campaign/[id]`), tabs (Overview, Session Log, Linked PCs/NPCs), save/restore encounters to campaign logs.
+- v0.7.0 — Resources Hub refresh with preset encounters, exports, snapshots.
+
+## [0.5.0] - 2025-08-26
+### Added
+- **Characters Hub refresh** to match Suite style: dark UI, rounded cards, no inner scrollbars.
+- **Header control group**: Import, Export, Clear, New PC.
+- **PC card grid** with inline edit (name, class, level) and “Details” affordance.
+- **Active campaign filtering**: when an Active Campaign is set, Characters defaults to linked PCs with a “Show all” toggle.
+
+### Changed
+- Consolidated spacing, borders, and hover states to match the Encounter Suite.
+- New PCs automatically link to current Active Campaign (if set).
+
+## [0.4.0] - 2025-08-25
+### Added
+- **Campaign Hub** redesigned into campaign cards with CSV import/export, notes, and session logs.
+- **Home** page campaign selector that sets `STORAGE_KEYS.ACTIVE_CAMPAIGN`.
+- **Global Top Nav** (`src/components/Nav.tsx`) with links to all hubs and an **Active Campaign** badge.
+- **Campaign page** shows the single active campaign’s details.
+
+### Changed
+- Removed scattered “Home” buttons (navigation is now global).
+- Legacy encounter routes redirect to `/encounters/suite` (kept from 0.2.x).
+
+## [0.3.0] - 2025-08-24
+### Changed
+- Removed experimental **bulk selection** (caused state bugs).
+- Simplified back to **single-target conditions**.
+- Tightened table padding and **active turn indicator** to a minimal single-ring marker.
+- **Round controls** encapsulated in their own box.
+- Added **Clear Encounter** button.
 
 ## [0.2.0] - 2025-08-25
 ### Added
