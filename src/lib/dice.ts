@@ -1,50 +1,56 @@
-export type RollResult = {
-  input: string;        // e.g., "2d20kh1+5"
+// src/lib/dice.ts
+// Lightweight dice roller with string parsing and breakdown output.
+// Supports "d20", "1d20+3", "4d8+4", "2d6-1", whitespace tolerant.
+
+export type DiceInput =
+  | string
+  | {
+      count: number; // e.g. 1
+      sides: number; // e.g. 20
+      mod?: number; // e.g. +3/-1
+    };
+
+export type DiceResult = {
   total: number;
-  parts: string[];      // ["d20: 17, 4 -> 17", "+5"]
-  timestamp: number;
+  rolls: number[];
+  sides: number;
+  mod: number;
+  notation: string;
 };
-const rand = () => Math.random();
 
-function rollDie(d: number) { return Math.floor(rand() * d) + 1; }
+const DICE_RE = /^\s*(\d*)\s*d\s*(\d+)\s*([+-]\s*\d+)?\s*$/i;
 
-export function roll(input: string): RollResult {
-  // Very small parser: supports 2d20, advantage: 2d20kh1, disadvantage: 2d20kl1, +/-
-  // examples: "1d20+5", "2d20kh1+7", "4d6dl1", "3d8-1"
-  const ts = Date.now();
-  const tokens = input.replace(/\s+/g, "").match(/[+-]?[^+-]+/g) ?? [];
-  const parts: string[] = [];
-  let total = 0;
+export function parseDice(notation: string): { count: number; sides: number; mod: number } {
+  const m = notation.match(DICE_RE);
+  if (!m) throw new Error(`Invalid dice string: "${notation}"`);
+  const count = m[1] ? parseInt(m[1], 10) : 1;
+  const sides = parseInt(m[2], 10);
+  const mod = m[3] ? parseInt(m[3].replace(/\s+/g, ""), 10) : 0;
+  if (count <= 0 || sides <= 0) throw new Error(`Invalid dice values in "${notation}"`);
+  return { count, sides, mod };
+}
 
-  for (const t of tokens) {
-    const sign = t.startsWith("-") ? -1 : 1;
-    const body = t.replace(/^[-+]/, "");
-    const m = body.match(/^(\d*)d(\d+)(k[hl](\d+)|d[hl](\d+))?$/i);
-    if (m) {
-      const count = Number(m[1] || 1);
-      const faces = Number(m[2]);
-      const mod = m[3] || "";
-      const keepHigh = /kh(\d+)/i.exec(mod)?.[1];
-      const keepLow  = /kl(\d+)/i.exec(mod)?.[1];
-      const dropHigh = /dh(\d+)/i.exec(mod)?.[1];
-      const dropLow  = /dl(\d+)/i.exec(mod)?.[1];
-
-      const rolls = Array.from({ length: count }, () => rollDie(faces));
-      let used = [...rolls];
-      if (keepHigh) used = rolls.sort((a,b)=>b-a).slice(0, Number(keepHigh));
-      if (keepLow)  used = rolls.sort((a,b)=>a-b).slice(0, Number(keepLow));
-      if (dropHigh) used = rolls.sort((a,b)=>a-b).slice(0, rolls.length - Number(dropHigh));
-      if (dropLow)  used = rolls.sort((a,b)=>b-a).slice(0, rolls.length - Number(dropLow));
-
-      const sum = used.reduce((a,b)=>a+b,0) * sign;
-      total += sum;
-      parts.push(`${t.includes("d")? "d"+faces : ""}: ${rolls.join(", ")} -> ${used.join("+")} = ${sum}`);
-    } else {
-      const num = Number(body) * sign;
-      total += num;
-      parts.push(`${sign>0?"+":""}${num}`);
-    }
+export function rollDice(input: DiceInput): DiceResult {
+  let count: number, sides: number, mod: number;
+  if (typeof input === "string") {
+    ({ count, sides, mod } = parseDice(input));
+  } else {
+    count = Math.max(1, Math.floor(input.count));
+    sides = Math.max(1, Math.floor(input.sides));
+    mod = Math.floor(input.mod ?? 0);
   }
 
-  return { input, total, parts, timestamp: ts };
+  const rolls: number[] = [];
+  for (let i = 0; i < count; i++) {
+    rolls.push(1 + Math.floor(Math.random() * sides));
+  }
+  const total = rolls.reduce((a, b) => a + b, 0) + mod;
+
+  const notation = `${count}d${sides}${mod ? (mod > 0 ? `+${mod}` : `${mod}`) : ""}`;
+  return { total, rolls, sides, mod, notation };
+}
+
+// Convenience helpers
+export function rollD20(mod: number = 0) {
+  return rollDice({ count: 1, sides: 20, mod });
 }

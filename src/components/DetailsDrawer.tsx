@@ -1,65 +1,91 @@
+// src/components/DetailsDrawer.tsx
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import * as React from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useRememberedState } from "@/hooks/useRememberedState";
 
 type Props = {
   open: boolean;
-  title?: string;
   onClose: () => void;
+  title?: string;
+  // Optional: use to namespace the remembered tab across different drawers
+  rememberKey?: string; // e.g. "pc-details" | "monster-details"
   children: React.ReactNode;
 };
 
-export default function DetailsDrawer({ open, title = "Details", onClose, children }: Props) {
-  const closeRef = useRef<HTMLButtonElement | null>(null);
+export default function DetailsDrawer({ open, onClose, title, rememberKey = "details-drawer", children }: Props) {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const [mounted, setMounted] = React.useState(false);
+  const [lastTab, setLastTab] = useRememberedState<string>(`gma.${rememberKey}.lastTab`, "default");
 
-  useEffect(() => {
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    // focus trap (lightweight): focus close on open
-    setTimeout(() => closeRef.current?.focus(), 0);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Memory: watch clicks inside the drawer for any element with data-drawer-tab
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tabEl = t?.closest?.("[data-drawer-tab]") as HTMLElement | null;
+      const key = tabEl?.getAttribute?.("data-drawer-tab");
+      if (key) setLastTab(key);
+    };
+    el.addEventListener("click", onClick);
+    return () => el.removeEventListener("click", onClick);
+  }, [setLastTab]);
+
+  if (!mounted) return null;
   if (!open) return null;
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[10000]"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
+    <>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60" />
-
-      {/* Panel */}
       <div
-        className="absolute right-0 top-0 h-full w-full sm:w-[420px] lg:w-[520px] bg-neutral-950 border-l shadow-2xl
-                   transition-transform duration-200 ease-out translate-x-0"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 bg-black/60 z-40"
+        onClick={onClose}
+        aria-hidden
+      />
+      {/* Panel */}
+      <aside
+        role="dialog"
+        aria-modal="true"
+        className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[420px] lg:w-[520px] bg-neutral-900 border-l border-white/10 shadow-2xl flex flex-col"
       >
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h3 className="font-semibold">{title}</h3>
+        <header className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <div>
+            {title && <h2 className="text-base font-semibold">{title}</h2>}
+            {/* Expose lastTab to children via data attribute for optional default selection */}
+            <div data-drawer-lasttab={lastTab} />
+          </div>
           <button
-            ref={closeRef}
-            className="inline-flex items-center gap-2 px-2 py-1 border rounded text-sm hover:bg-white/10 cursor-pointer"
             onClick={onClose}
-            aria-label="Close details"
+            className="px-2 py-1 border rounded text-xs hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
+            title="Close"
           >
-            <X className="h-4 w-4" /> Close
+            <span className="inline-flex items-center gap-1">
+              <X className="w-4 h-4" /> Close
+            </span>
           </button>
-        </div>
+        </header>
 
-        <div className="p-4 overflow-y-auto h-[calc(100%-52px)]">
+        <div ref={ref} className="flex-1 overflow-auto p-4">
           {children}
         </div>
-      </div>
-    </div>,
+      </aside>
+    </>,
     document.body
   );
 }

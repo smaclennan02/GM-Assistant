@@ -1,491 +1,315 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import React, { useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { downloadJSON, uploadJSON } from "@/lib/io";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { useStorageState } from "@/storage/useStorageState";
+import { localDriver } from "@/storage/localDriver";
+import { STORAGE_KEYS } from "@/storage/keys";
+import { Calendar, FileText, Save, Edit3 } from "lucide-react";
+import HomeButton from "@/components/HomeButton";
 
-/* =============== SSR-safe storage helpers =============== */
-function safeRead<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function safeWrite(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
-}
+/**
+ * Campaign (Active) – detail page
+ * Reads active campaign id from ACTIVE_CAMPAIGN_KEY and displays/edits that campaign only.
+ * If none is active, shows a friendly prompt to go Home and select one.
+ */
 
-/* =============== Types & utils =============== */
-type Note = {
+type SessionLogEntry = {
   id: string;
-  title: string;
-  body: string;        // markdown text
-  tags: string[];      // ["session","quest"]
-  folderId?: string;   // for tree
-  pinned?: boolean;
-  createdAt: number;
-  updatedAt: number;
+  date: string; // ISO yyyy-mm-dd
+  title?: string;
+  text?: string;
 };
-type Folder = {
+
+type Campaign = {
   id: string;
   name: string;
-  parentId?: string;
+  world?: string;
+  description?: string;
+  createdAt: number;
+  updatedAt: number;
+  notes?: string;
+  log?: SessionLogEntry[];
 };
 
-const newId = () => Math.random().toString(36).slice(2, 9);
-const parseTags = (s: string) =>
-  Array.from(new Set(s.split(",").map(t => t.trim()).filter(Boolean)));
+const CAMPAIGNS_KEY: string = (STORAGE_KEYS as any)?.CAMPAIGNS ?? "gma.v1.campaigns";
+const ACTIVE_CAMPAIGN_KEY: string = (STORAGE_KEYS as any)?.ACTIVE_CAMPAIGN ?? "gma.v1.active-campaign";
 
-/* =============== Page =============== */
-export default function CampaignPage() {
-  /* ---- state ---- */
-const [folders, setFolders] = useState<Folder[]>(() =>
-  typeof window !== "undefined" ? safeRead<Folder[]>("notes.folders", []) : []
-);
-const [notes, setNotes] = useState<Note[]>(() =>
-  typeof window !== "undefined" ? safeRead<Note[]>("notes.items", []) : []
-);
-const [selectedId, setSelectedId] = useState<string | null>(() =>
-  typeof window !== "undefined" ? safeRead<string | null>("notes.selected", null) : null
-);
+const newId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
 
-  const [search, setSearch] = useState("");
+function fmtDate(ts?: number) {
+  if (!ts || !Number.isFinite(ts)) return "—";
+  try {
+    const d = new Date(ts);
+    return d.toLocaleDateString();
+  } catch {
+    return "—";
+  }
+}
 
-  /* ---- persist ---- */
-  useEffect(() => { safeWrite("notes.folders", folders); }, [folders]);
-  useEffect(() => { safeWrite("notes.items", notes); }, [notes]);
-  useEffect(() => { safeWrite("notes.selected", selectedId); }, [selectedId]);
+export default function ActiveCampaignPage() {
+  const [campaigns, setCampaigns] = useStorageState<Campaign[]>({
+    key: CAMPAIGNS_KEY,
+    driver: localDriver,
+    initial: [],
+    version: 1,
+  });
 
-  /* ---- derived ---- */
-  const selected = useMemo(
-    () => notes.find(n => n.id === selectedId) || null,
-    [notes, selectedId]
+  const [activeId] = useStorageState<string | null>({
+    key: ACTIVE_CAMPAIGN_KEY,
+    driver: localDriver,
+    initial: null,
+    version: 1,
+  });
+
+  const active = useMemo(
+    () => (campaigns || []).find((c) => c.id === activeId) || null,
+    [campaigns, activeId]
   );
 
-  const pinned = useMemo(
-    () => notes.filter(n => n.pinned).sort((a, b) => b.updatedAt - a.updatedAt),
-    [notes]
-  );
+  const [editing, setEditing] = useState(false);
 
-  const rootFolders = useMemo(
-    () => folders.filter(f => !f.parentId),
-    [folders]
-  );
-
-  const filteredNotes = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return notes;
-    return notes.filter(n =>
-      n.title.toLowerCase().includes(q) ||
-      n.body.toLowerCase().includes(q) ||
-      n.tags.some(t => t.toLowerCase().includes(q))
+  const updateCampaign = (patch: Partial<Campaign>) => {
+    if (!active) return;
+    setCampaigns((prev) =>
+      (prev || []).map((c) =>
+        c.id === active.id ? { ...c, ...patch, updatedAt: Date.now() } : c
+      )
     );
-  }, [notes, search]);
+  };
 
-  /* ---- folder ops ---- */
-  function addFolder() {
-    const name = prompt("New folder name?")?.trim();
-    if (!name) return;
-    setFolders(f => [...f, { id: newId(), name }]);
-  }
-  function renameFolder(id: string) {
-    const f = folders.find(x => x.id === id);
-    if (!f) return;
-    const name = prompt("Rename folder:", f.name)?.trim();
-    if (!name) return;
-    setFolders(fs => fs.map(x => x.id === id ? { ...x, name } : x));
-  }
-  function deleteFolder(id: string) {
-    if (!confirm("Delete this folder? Notes will not be deleted.")) return;
-    setFolders(fs => fs.filter(x => x.id !== id));
-    // orphaned notes remain, but no folderId
-    setNotes(ns => ns.map(n => n.folderId === id ? { ...n, folderId: undefined } : n));
-  }
-
-  /* ---- note ops ---- */
-  function newNote(folderId?: string) {
-    const n: Note = {
+  const addLog = () => {
+    if (!active) return;
+    const entry: SessionLogEntry = {
       id: newId(),
-      title: "Untitled",
-      body: "",
-      tags: [],
-      folderId,
-      pinned: false,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      date: new Date().toISOString().slice(0, 10),
+      title: "",
+      text: "",
     };
-    setNotes(ns => [n, ...ns]);
-    setSelectedId(n.id);
-  }
+    setCampaigns((prev) =>
+      (prev || []).map((c) =>
+        c.id === active.id
+          ? { ...c, log: [...(c.log || []), entry], updatedAt: Date.now() }
+          : c
+      )
+    );
+  };
 
-  function dupNote(id: string) {
-    const src = notes.find(n => n.id === id); if (!src) return;
-    const copy: Note = {
-      ...src,
-      id: newId(),
-      title: src.title + " (copy)",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    setNotes(ns => [copy, ...ns]);
-    setSelectedId(copy.id);
-    toast.success("Note duplicated");
-  }
+  const updateLog = (entryId: string, patch: Partial<SessionLogEntry>) => {
+    if (!active) return;
+    setCampaigns((prev) =>
+      (prev || []).map((c) =>
+        c.id === active.id
+          ? {
+              ...c,
+              log: (c.log || []).map((e) => (e.id === entryId ? { ...e, ...patch } : e)),
+              updatedAt: Date.now(),
+            }
+          : c
+      )
+    );
+  };
 
-  function deleteNote(id: string) {
-    if (!confirm("Delete this note?")) return;
-    setNotes(ns => ns.filter(n => n.id !== id));
-    if (selectedId === id) setSelectedId(null);
-  }
+  const removeLog = (entryId: string) => {
+    if (!active) return;
+    setCampaigns((prev) =>
+      (prev || []).map((c) =>
+        c.id === active.id
+          ? { ...c, log: (c.log || []).filter((e) => e.id !== entryId), updatedAt: Date.now() }
+          : c
+      )
+    );
+  };
 
-  function updateNote(id: string, patch: Partial<Note>) {
-    setNotes(ns => ns.map(n => n.id === id ? { ...n, ...patch, updatedAt: Date.now() } : n));
-  }
+  if (!active) {
+    return (
+      <div className="space-y-4">
+        <header className="rounded-lg border p-4 flex flex-wrap items-center gap-3 justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold">Campaign</h1>
+            <p className="text-xs opacity-70">No active campaign selected.</p>
+          </div>
+          <HomeButton />
+        </header>
 
-  function moveNoteToFolder(id: string, folderId?: string) {
-    updateNote(id, { folderId });
+        <section className="rounded-lg border p-4">
+          <div className="text-sm opacity-80">
+            Head to <b>Home</b> and select a campaign. Once selected, this page will show that campaign’s
+            overview, notes, and session log.
+          </div>
+        </section>
+      </div>
+    );
   }
-
-  /* ---- export / import ---- */
-  function exportAll() {
-    downloadJSON("campaign-notes.json", { folders, notes, selectedId });
-    toast.success("Exported campaign notes");
-  }
-  async function importAll() {
-    try {
-      const data = await uploadJSON();
-      const obj = data as { folders?: Folder[]; notes?: Note[]; selectedId?: string | null };
-      if (!obj || !Array.isArray(obj.notes) || !Array.isArray(obj.folders)) {
-        throw new Error("Invalid file format");
-      }
-      setFolders(obj.folders);
-      setNotes(obj.notes);
-      setSelectedId(obj.selectedId ?? null);
-      toast.success("Imported campaign notes");
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Import failed");
-    }
-  }
-
-  /* ---- UI helpers ---- */
-  const notesInFolder = (folderId?: string) =>
-    filteredNotes
-      .filter(n => (folderId ? n.folderId === folderId : !n.folderId))
-      .sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4">
-      {/* ---------------- Sidebar ---------------- */}
-      <Card className="bg-parchment/90">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center justify-between">Campaign</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Search notes…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+    <div className="space-y-4">
+      {/* Header */}
+      <header className="rounded-lg border p-4 flex flex-wrap items-center gap-3 justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold">Campaign</h1>
+          <p className="text-xs opacity-70">
+            {active.name || "Untitled"}{active.world ? ` • ${active.world}` : ""}
+          </p>
+        </div>
 
-          <div className="flex gap-2">
-            <Button onClick={() => newNote()} className="flex-1">+ New Note</Button>
-            <Button variant="outline" onClick={addFolder}>+ Folder</Button>
-          </div>
-
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={exportAll}>Export</Button>
-            <Button variant="outline" onClick={importAll}>Import</Button>
-          </div>
-
-          {/* Pinned */}
-          {pinned.length > 0 && (
-            <div>
-              <div className="text-xs font-medium uppercase opacity-70 mb-1">Pinned</div>
-              <ul className="space-y-1">
-                {pinned.map(n => (
-                  <li key={n.id}>
-                    <button
-                      className={`w-full text-left rounded px-2 py-1 hover:bg-black/5 ${selectedId === n.id ? "bg-black/5" : ""}`}
-                      onClick={() => setSelectedId(n.id)}
-                      title={new Date(n.updatedAt).toLocaleString()}
-                    >
-                      ⭐ {n.title}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Folders */}
-          <div className="mt-2">
-            <div className="text-xs font-medium uppercase opacity-70 mb-1">Folders</div>
-            {rootFolders.length === 0 && (
-              <div className="text-xs opacity-70 mb-2">No folders yet.</div>
-            )}
-            <ul className="space-y-2">
-              {rootFolders.map(f => (
-                <li key={f.id}>
-                  <div className="flex items-center justify-between">
-                    <button
-                      className="text-left font-medium hover:underline"
-                      onClick={() => {/* noop: section heading */}}
-                    >
-                      {f.name}
-                    </button>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => renameFolder(f.id)}>Rename</Button>
-                      <Button variant="destructive" size="sm" onClick={() => deleteFolder(f.id)}>Delete</Button>
-                    </div>
-                  </div>
-
-                  {/* Notes in this folder */}
-                  <ul className="mt-1 space-y-1">
-                    {notesInFolder(f.id).map(n => (
-                      <li key={n.id}>
-                        <button
-                          className={`w-full text-left rounded px-2 py-1 hover:bg-black/5 ${selectedId === n.id ? "bg-black/5" : ""}`}
-                          onClick={() => setSelectedId(n.id)}
-                          title={new Date(n.updatedAt).toLocaleString()}
-                        >
-                          {n.title}
-                        </button>
-                      </li>
-                    ))}
-                    {notesInFolder(f.id).length === 0 && (
-                      <li className="text-xs opacity-60 px-2 py-1">No notes here.</li>
-                    )}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Unfiled */}
-          <div className="mt-2">
-            <div className="text-xs font-medium uppercase opacity-70 mb-1">Unfiled</div>
-            <ul className="space-y-1">
-              {notesInFolder(undefined).map(n => (
-                <li key={n.id}>
-                  <button
-                    className={`w-full text-left rounded px-2 py-1 hover:bg-black/5 ${selectedId === n.id ? "bg-black/5" : ""}`}
-                    onClick={() => setSelectedId(n.id)}
-                    title={new Date(n.updatedAt).toLocaleString()}
-                  >
-                    {n.title}
-                  </button>
-                </li>
-              ))}
-              {notesInFolder(undefined).length === 0 && (
-                <li className="text-xs opacity-60 px-2 py-1">No unfiled notes.</li>
-              )}
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ---------------- Editor Pane ---------------- */}
-      <Card className="bg-parchment/90">
-        <CardHeader className="pb-2">
-          <CardTitle>Editor</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {!selected ? (
-            <div className="opacity-70 text-sm">Select a note or create a new one.</div>
+        <div className="flex items-center gap-2">
+          <HomeButton />
+          {!editing ? (
+            <button
+              className="h-8 px-3 rounded border text-sm inline-flex items-center gap-1 hover:bg-white/10"
+              onClick={() => setEditing(true)}
+              title="Edit header"
+            >
+              <Edit3 className="h-4 w-4" /> Edit
+            </button>
           ) : (
-            <NoteEditor
-              note={selected}
-              folders={folders}
-              onChange={(patch) => updateNote(selected.id, patch)}
-              onDelete={() => deleteNote(selected.id)}
-              onDuplicate={() => dupNote(selected.id)}
-              onMove={(fid) => moveNoteToFolder(selected.id, fid)}
-            />
+            <button
+              className="h-8 px-3 rounded border text-sm inline-flex items-center gap-1 hover:bg-white/10"
+              onClick={() => setEditing(false)}
+              title="Done"
+            >
+              <Save className="h-4 w-4" /> Done
+            </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </header>
+
+      {/* Overview */}
+      <section className="rounded-lg border p-3 space-y-3">
+        {!editing ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <OverviewRow label="Name" value={active.name || "Untitled"} />
+              <OverviewRow label="World" value={active.world || "—"} />
+              <OverviewRow label="Created" value={fmtDate(active.createdAt)} />
+              <OverviewRow label="Updated" value={fmtDate(active.updatedAt)} />
+            </div>
+            <div className="text-sm opacity-80 min-h-[20px]">
+              {active.description || <span className="opacity-50">No description.</span>}
+            </div>
+          </>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Labeled>
+              <label className="text-xs opacity-70">Name</label>
+              <Input
+                value={active.name}
+                onChange={(e) => updateCampaign({ name: e.target.value })}
+                placeholder="Campaign name"
+              />
+            </Labeled>
+            <Labeled>
+              <label className="text-xs opacity-70">World</label>
+              <Input
+                value={active.world || ""}
+                onChange={(e) => updateCampaign({ world: e.target.value })}
+                placeholder="World/setting"
+              />
+            </Labeled>
+            <Labeled className="md:col-span-1">
+              <label className="text-xs opacity-70">Created / Updated</label>
+              <div className="text-sm opacity-70 p-2 border rounded">
+                {fmtDate(active.createdAt)} • {fmtDate(active.updatedAt)}
+              </div>
+            </Labeled>
+            <Labeled className="md:col-span-3">
+              <label className="text-xs opacity-70">Description</label>
+              <Input
+                value={active.description || ""}
+                onChange={(e) => updateCampaign({ description: e.target.value })}
+                placeholder="Short description"
+              />
+            </Labeled>
+          </div>
+        )}
+      </section>
+
+      {/* Notes */}
+      <section className="rounded-lg border p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 opacity-70" />
+          <div className="text-sm font-semibold">DM Notes</div>
+        </div>
+        <textarea
+          className="px-2 py-2 border rounded bg-transparent w-full min-h-[140px]"
+          value={active.notes || ""}
+          onChange={(e) => updateCampaign({ notes: e.target.value })}
+          placeholder="Worldbuilding, factions, plot threads…"
+        />
+      </section>
+
+      {/* Session Log */}
+      <section className="rounded-lg border p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 opacity-70" />
+            <div className="text-sm font-semibold">Session Log</div>
+          </div>
+        <button
+          className="px-2 py-1 border rounded text-xs hover:bg-white/10"
+          onClick={addLog}
+        >
+          + Add Entry
+        </button>
+        </div>
+
+        {(active.log || []).length === 0 ? (
+          <div className="text-xs opacity-60">No entries yet.</div>
+        ) : (
+          <div className="space-y-2">
+            {(active.log || []).map((e) => (
+              <div key={e.id} className="rounded border p-2 space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    className="px-2 py-1 border rounded bg-transparent"
+                    value={e.date || ""}
+                    onChange={(ev) => updateLog(e.id, { date: ev.target.value })}
+                  />
+                  <Input
+                    placeholder="Title (optional)"
+                    value={e.title || ""}
+                    onChange={(ev) => updateLog(e.id, { title: ev.target.value })}
+                  />
+                </div>
+                <textarea
+                  className="px-2 py-2 border rounded bg-transparent w-full min-h-[80px]"
+                  placeholder="Summary, major events, loot, NPCs met…"
+                  value={e.text || ""}
+                  onChange={(ev) => updateLog(e.id, { text: ev.target.value })}
+                />
+                <div className="flex justify-end">
+                  <button
+                    className="px-2 py-1 border rounded text-xs hover:bg-white/10"
+                    onClick={() => removeLog(e.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-/* =============== Note Editor =============== */
-function NoteEditor(props: {
-  note: Note;
-  folders: Folder[];
-  onChange: (patch: Partial<Note>) => void;
-  onDelete: () => void;
-  onDuplicate: () => void;
-  onMove: (folderId?: string) => void;
-}) {
-  const { note, folders, onChange, onDelete, onDuplicate, onMove } = props;
-
-  // local editable fields
-  const [title, setTitle] = useState(note.title);
-  const [tagsStr, setTagsStr] = useState(note.tags.join(", "));
-  const [body, setBody] = useState(note.body);
-  const [folderId, setFolderId] = useState<string | "">(note.folderId ?? "");
-  const [pinned, setPinned] = useState<boolean>(!!note.pinned);
-  const areaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  // ✅ Initialize locals ONLY when the selected note changes
-  useEffect(() => {
-    setTitle(note.title);
-    setTagsStr(note.tags.join(", "));
-    setBody(note.body);
-    setFolderId(note.folderId ?? "");
-    setPinned(!!note.pinned);
-  }, [note.id]); // <-- key change: depend on note.id only
-
-  // ✅ Autosave upstream when locals change (guarded)
-  useEffect(() => {
-    if (title !== note.title) onChange({ title });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title]);
-
-  useEffect(() => {
-    const tags = parseTags(tagsStr);
-    if (tags.join(",") !== note.tags.join(",")) onChange({ tags });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tagsStr]);
-
-  useEffect(() => {
-    if (body !== note.body) onChange({ body });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body]);
-
-  useEffect(() => {
-    const fid = folderId || undefined;
-    if (fid !== note.folderId) onMove(fid);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folderId]);
-
-  useEffect(() => {
-    const p = !!pinned;
-    if (p !== !!note.pinned) onChange({ pinned: p });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinned]);
-
-  // Tiny markdown toolbar helpers
-  function wrap(prefix: string, suffix: string = "") {
-    const ta = areaRef.current; if (!ta) return;
-    const { selectionStart, selectionEnd, value } = ta;
-    const before = value.slice(0, selectionStart);
-    const sel = value.slice(selectionStart, selectionEnd);
-    const after = value.slice(selectionEnd);
-    const next = before + prefix + sel + suffix + after;
-    setBody(next);
-    const caret = selectionStart + prefix.length + sel.length + suffix.length;
-    requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = caret; ta.focus(); });
-  }
-
-  function insertLineStart(s: string) {
-    const ta = areaRef.current; if (!ta) return;
-    const { selectionStart, selectionEnd, value } = ta;
-    const start = value.lastIndexOf("\n", selectionStart - 1) + 1;
-    const end = selectionEnd;
-    const before = value.slice(0, start);
-    const mid = value.slice(start, end);
-    const after = value.slice(end);
-    const next = before + s + mid + after;
-    setBody(next);
-    requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = end + s.length; ta.focus(); });
-  }
-
+/* ===== UI bits ===== */
+function OverviewRow({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
-    <div className="space-y-3">
-      <div className="grid md:grid-cols-6 gap-2 items-center">
-        <div className="md:col-span-4">
-          <Input
-            placeholder="Title…"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
-        <div className="md:col-span-2 flex gap-2 justify-end">
-          <Button variant="outline" onClick={() => setPinned(v => !v)}>
-            {pinned ? "⭐ Unpin" : "☆ Pin"}
-          </Button>
-          <Button variant="outline" onClick={onDuplicate}>Duplicate</Button>
-          <Button variant="destructive" onClick={onDelete}>Delete</Button>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-6 gap-2">
-        <div className="md:col-span-3">
-          <Input
-            placeholder="tags, comma, separated"
-            value={tagsStr}
-            onChange={(e) => setTagsStr(e.target.value)}
-          />
-        </div>
-        <div className="md:col-span-2">
-          <select
-            className="w-full border rounded px-2 py-2 bg-white/80 text-sm"
-            value={folderId}
-            onChange={(e) => setFolderId(e.target.value as "" | string)}
-            title="Folder"
-          >
-            <option value="">(No folder)</option>
-            {folders.map(f => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="md:col-span-1 text-right text-xs opacity-70 self-center">
-          Last saved: {new Date(note.updatedAt).toLocaleTimeString()}
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={() => insertLineStart("# ")}>H1</Button>
-        <Button variant="outline" size="sm" onClick={() => insertLineStart("## ")}>H2</Button>
-        <Button variant="outline" size="sm" onClick={() => wrap("**", "**")}>Bold</Button>
-        <Button variant="outline" size="sm" onClick={() => wrap("_", "_")}>Italic</Button>
-        <Button variant="outline" size="sm" onClick={() => insertLineStart("- ")}>• List</Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            const url = prompt("Link URL (https://...)")?.trim(); if (!url) return;
-            wrap("[", `](${url})`);
-          }}
-        >
-          Link
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => wrap("@", "")}
-          title="Insert @ reference"
-        >
-          @Ref
-        </Button>
-      </div>
-
-      {/* Editor */}
-      <textarea
-        ref={areaRef}
-        className="w-full min-h-[420px] rounded border bg-white/80 p-3 font-mono text-sm leading-6"
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Write your notes in Markdown…"
-      />
-
-      {/* Footer */}
-      <div className="flex items-center justify-between text-xs opacity-70">
-        <div>Created: {new Date(note.createdAt).toLocaleString()}</div>
-        <div>Words: {body.trim() ? body.trim().split(/\s+/).length : 0}</div>
-      </div>
+    <div className="rounded border p-2">
+      <div className="text-xs opacity-70">{label}</div>
+      <div className="text-sm font-medium">{value ?? "—"}</div>
     </div>
   );
+}
+
+function Labeled({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`space-y-1 ${className}`}>{children}</div>;
 }
