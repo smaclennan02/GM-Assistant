@@ -43,6 +43,10 @@ import type { Monster } from "@/types/monsters";
 
 import HomeButton from "@/components/HomeButton";
 
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef } from "react";
+
+
 
 /* ===== Types ===== */
 type TimedCondition = { key: ConditionKey; rounds: number };
@@ -578,9 +582,6 @@ export default function EncounterSuitePage() {
         <div className="flex items-center gap-3">
           {/* Status: ring + active name */}
           <div className="flex items-center gap-2">
-  <HomeButton />
-  {/* (keep the rest of your buttons: Start, Prev, Next, Round, Lock, Clear Inits, etc.) */}
-
             
             <button
               className={

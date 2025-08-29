@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useStorageState } from "@/storage/useStorageState";
 import { localDriver } from "@/storage/localDriver";
 import { STORAGE_KEYS } from "@/storage/keys";
@@ -33,8 +32,8 @@ type Campaign = {
   log?: SessionLogEntry[];
 };
 
-const CAMPAIGNS_KEY: string = (STORAGE_KEYS as any)?.CAMPAIGNS ?? "gma.v1.campaigns";
-const ACTIVE_CAMPAIGN_KEY: string = (STORAGE_KEYS as any)?.ACTIVE_CAMPAIGN ?? "gma.v1.active-campaign";
+const CAMPAIGNS_KEY: string = STORAGE_KEYS.CAMPAIGNS;
+const ACTIVE_CAMPAIGN_KEY: string = STORAGE_KEYS.ACTIVE_CAMPAIGN;
 
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -151,7 +150,7 @@ export default function ActiveCampaignPage() {
       {/* Header */}
       <header className="rounded-lg border p-4 flex flex-wrap items-center gap-3 justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold">Campaign</h1>
+          <h1 className="text-2xl font-bold">Campaigns</h1>
           <p className="text-xs opacity-70">
             {active.name || "Untitled"}{active.world ? ` • ${active.world}` : ""}
           </p>

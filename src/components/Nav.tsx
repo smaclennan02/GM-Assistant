@@ -9,10 +9,8 @@ import { STORAGE_KEYS } from "@/storage/keys";
 
 type Campaign = { id: string; name: string };
 
-const CAMPAIGNS_KEY: string =
-  (STORAGE_KEYS as any)?.CAMPAIGNS ?? "gma.v1.campaigns";
-const ACTIVE_CAMPAIGN_KEY: string =
-  (STORAGE_KEYS as any)?.ACTIVE_CAMPAIGN ?? "gma.v1.active-campaign";
+const CAMPAIGNS_KEY: string = STORAGE_KEYS.CAMPAIGNS;
+const ACTIVE_CAMPAIGN_KEY: string = STORAGE_KEYS.ACTIVE_CAMPAIGN;
 
 export default function Nav() {
   const pathname = usePathname();
@@ -33,13 +31,13 @@ export default function Nav() {
   const activeName =
     (campaigns || []).find((c) => c?.id === activeId)?.name ?? null;
 
-  const items = [
-    { href: "/",                  label: "Home",           Icon: Home,  exact: true },
-    { href: "/encounters/suite", label: "Encounter Suite", Icon: Sword },
-    { href: "/characters",       label: "Characters",       Icon: Users },
-    { href: "/campaign",         label: "Campaign",         Icon: Map },
-    { href: "/resources",        label: "Resources",        Icon: BookOpen },
-  ] as const;
+  const items: { href: string; label: string; Icon: typeof Home; exact?: boolean }[] = [
+    { href: "/",                  label: "Home",       Icon: Home,  exact: true },
+    { href: "/encounters/suite", label: "Encounters", Icon: Sword },
+    { href: "/characters",       label: "Characters", Icon: Users },
+    { href: "/campaign",         label: "Campaigns",  Icon: Map },
+    { href: "/resources",        label: "Resources",  Icon: BookOpen },
+  ];
 
   return (
     <nav className="sticky top-0 z-50 backdrop-blur bg-parchment/70 border-b">

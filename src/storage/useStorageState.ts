@@ -27,7 +27,7 @@ export function useStorageState<T>(opts: Options<T>) {
   } = opts;
 
   const initialValue = useMemo(
-    () => (typeof initial === "function" ? (initial as any)() : initial),
+    () => (typeof initial === "function" ? (initial as () => T)() : initial),
     [initial]
   );
 

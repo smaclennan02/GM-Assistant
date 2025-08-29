@@ -54,3 +54,26 @@ export function rollDice(input: DiceInput): DiceResult {
 export function rollD20(mod: number = 0) {
   return rollDice({ count: 1, sides: 20, mod });
 }
+
+// Compatibility wrapper for UI dice tool
+export type RollResult = {
+  input: string;
+  total: number;
+  parts: string[];
+  timestamp: number;
+};
+
+export function roll(input: string): RollResult {
+  const r = rollDice(input);
+  const rollsText = r.rolls.length ? r.rolls.join(" + ") : "";
+  const modText = r.mod ? (r.mod > 0 ? ` + ${r.mod}` : ` - ${Math.abs(r.mod)}`) : "";
+  const parts = [
+    [rollsText, modText].filter(Boolean).join("") || `${r.notation}`,
+  ];
+  return {
+    input: r.notation,
+    total: r.total,
+    parts,
+    timestamp: Date.now(),
+  };
+}

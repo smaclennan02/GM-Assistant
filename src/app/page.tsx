@@ -33,8 +33,8 @@ type Campaign = {
   log?: { id: string; date: string; title?: string; text?: string }[];
 };
 
-const CAMPAIGNS_KEY: string = (STORAGE_KEYS as any)?.CAMPAIGNS ?? "gma.v1.campaigns";
-const ACTIVE_CAMPAIGN_KEY: string = (STORAGE_KEYS as any)?.ACTIVE_CAMPAIGN ?? "gma.v1.active-campaign";
+const CAMPAIGNS_KEY: string = STORAGE_KEYS.CAMPAIGNS;
+const ACTIVE_CAMPAIGN_KEY: string = STORAGE_KEYS.ACTIVE_CAMPAIGN;
 
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -117,9 +117,9 @@ export default function HomeCampaignSelector() {
               <Link
                 href="/encounters/suite"
                 className="px-3 py-2 border rounded text-sm hover:bg-white/10"
-                title="Open Encounter Suite"
+                title="Open Encounters"
               >
-                Encounter Suite
+                Encounters
               </Link>
               <Link
                 href="/characters"
@@ -131,9 +131,9 @@ export default function HomeCampaignSelector() {
               <Link
                 href="/campaign"
                 className="px-3 py-2 border rounded text-sm hover:bg-white/10"
-                title="Open Campaign Hub"
+                title="Open Campaigns"
               >
-                Campaign Hub
+                Campaigns
               </Link>
               <button
                 className="px-3 py-2 border rounded text-sm hover:bg-white/10"
@@ -258,7 +258,7 @@ export default function HomeCampaignSelector() {
       <section className="rounded-lg border p-3">
         <div className="text-xs opacity-70">
           Once a campaign is active, other pages can read <code>STORAGE_KEYS.ACTIVE_CAMPAIGN</code> (or
-          <code> "gma.v1.active-campaign"</code>) to filter what they show — e.g., Characters can show only PCs linked
+          <code>&quot;gma.v1.active-campaign&quot;</code>) to filter what they show - e.g., Characters can show only PCs linked
           to that campaign, and the Encounter Suite can save/restore state per campaign.
         </div>
       </section>

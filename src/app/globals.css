@@ -43,6 +43,33 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ===== Print Styles ===== */
+@media print {
+  @page { size: A4; margin: 12mm; }
+
+  /* Hide chrome and interactive-only elements */
+  nav, .no-print, .sticky { display: none !important; }
+  button, input, select, textarea { box-shadow: none !important; }
+
+  html, body { background: #fff !important; color: #000 !important; }
+  .print\:hidden { display: none !important; }
+  .print\:block { display: block !important; }
+  .print\:border-none { border: none !important; }
+  .print\:shadow-none { box-shadow: none !important; }
+  .print\:p-0 { padding: 0 !important; }
+  .print\:m-0 { margin: 0 !important; }
+  .print\:bg-transparent { background: transparent !important; }
+
+  /* Constrain sheet width to A4 printable area */
+  .sheet-container {
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+  }
+
+  /* Avoid awkward splits for cards/sections */
+  section, .rounded, .rounded-lg, .border, .card { break-inside: avoid; page-break-inside: avoid; }
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);

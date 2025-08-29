@@ -12,12 +12,12 @@ export default function DicePage() {
   const [expr, setExpr] = useState("1d20+5");
   const [result, setResult] = useState<RollResult | null>(null);
   const [history, setHistory] = useState<RollResult[]>(
-    () => JSON.parse(localStorage.getItem("dice.history") || "[]")
+    () => (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("dice.history") || "[]") : [])
   );
   const [macros, setMacros] = useState<Macro[]>(
-    () => JSON.parse(localStorage.getItem("dice.macros") || "[]")
+    () => (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("dice.macros") || "[]") : [])
   );
-  const [d20mod, setD20mod] = useState<string>(() => localStorage.getItem("dice.d20mod") || "0");
+  const [d20mod, setD20mod] = useState<string>(() => (typeof window !== "undefined" ? localStorage.getItem("dice.d20mod") || "0" : "0"));
 
   useEffect(() => localStorage.setItem("dice.history", JSON.stringify(history.slice(0, 50))), [history]);
   useEffect(() => localStorage.setItem("dice.macros", JSON.stringify(macros)), [macros]);

@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const message =
       err instanceof z.ZodError
-        ? err.errors.map((e) => e.message).join(", ")
+        ? err.issues.map((e) => e.message).join(", ")
         : err instanceof Error
         ? err.message
         : "Invalid request";

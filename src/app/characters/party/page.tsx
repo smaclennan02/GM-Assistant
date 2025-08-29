@@ -33,15 +33,18 @@ export default function PartyPage() {
       const arr = data as unknown;
       if (!Array.isArray(arr)) throw new Error("JSON is not an array");
       // minimal shape check
-      const imported: PC[] = arr.map((r: any) => ({
-        id: typeof r.id === "string" ? r.id : newId(),
-        name: String(r.name ?? "Unnamed"),
-        initMod: typeof r.initMod === "number" ? r.initMod : undefined,
-        ac: typeof r.ac === "number" ? r.ac : undefined,
-        hp: typeof r.hp === "string" ? r.hp : undefined,
-        passive: typeof r.passive === "number" ? r.passive : undefined,
-        notes: typeof r.notes === "string" ? r.notes : undefined,
-      }));
+      const imported: PC[] = arr.map((r) => {
+        const o = r as Record<string, unknown>;
+        return {
+          id: typeof o.id === "string" ? (o.id as string) : newId(),
+          name: String(o.name ?? "Unnamed"),
+          initMod: typeof o.initMod === "number" ? (o.initMod as number) : undefined,
+          ac: typeof o.ac === "number" ? (o.ac as number) : undefined,
+          hp: typeof o.hp === "string" ? (o.hp as string) : undefined,
+          passive: typeof o.passive === "number" ? (o.passive as number) : undefined,
+          notes: typeof o.notes === "string" ? (o.notes as string) : undefined,
+        };
+      });
       setPcs(imported);
       toast.success(`Imported ${imported.length} PCs`);
     } catch (e: unknown) {

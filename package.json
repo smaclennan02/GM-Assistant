@@ -7,7 +7,10 @@
     "dev:inspect": "cross-env NEXT_WEBPACK_USE_TURBOPACK=0 node --inspect node_modules/next/dist/bin/next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "version:patch": "npm version patch",
+    "postversion": "node scripts/postversion.mjs",
+    "codex:dev": "on-failure"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",

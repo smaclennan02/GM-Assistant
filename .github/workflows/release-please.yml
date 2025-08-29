@@ -1,0 +1,41 @@
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release Please
+        uses: google-github-actions/release-please-action@v4
+        with:
+          release-type: node
+          package-name: gm-assistant
+          default-branch: main
+          changelog-path: CHANGELOG.md
+          # Optional: honor pre-1.0 minor bumps for features
+          bump-minor-pre-major: true
+
+      - name: Find open release PR
+        id: find_pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prs = await github.rest.pulls.list({ owner, repo, state: 'open' });
+            const pr = prs.data.find(p => p.title && p.title.toLowerCase().startsWith('chore: release'));
+            core.setOutput('pr', pr ? pr.number : '');
+
+      - name: Enable auto-merge on release PR (squash)
+        if: steps.find_pr.outputs.pr != ''
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          pull-request-number: ${{ steps.find_pr.outputs.pr }}
+          merge-method: squash

@@ -8,7 +8,7 @@ const LEGACY_KEYS = [
   "gm.encounters",
 ];
 
-type AnyJson = any;
+type AnyJson = unknown;
 
 function safeLocalStorage(): Storage | null {
   try {
@@ -45,11 +45,16 @@ export function migrateCharactersIfNeeded(targetKey: string) {
 
     try {
       const parsed: AnyJson = JSON.parse(raw);
-      const pcs = Array.isArray(parsed) ? parsed : parsed?.pcs;
+      const pcs = Array.isArray(parsed)
+        ? parsed
+        : (parsed && typeof parsed === "object" && (parsed as { pcs?: unknown }).pcs) || [];
       if (Array.isArray(pcs) && pcs.length > 0) {
         const canonical = {
           pcs,
-          npcs: Array.isArray(parsed?.npcs) ? parsed.npcs : [],
+          npcs:
+            parsed && typeof parsed === "object" && Array.isArray((parsed as { npcs?: unknown }).npcs)
+              ? ((parsed as { npcs?: unknown }).npcs as unknown[])
+              : [],
           updatedAt: Date.now(),
 
         };

@@ -1,0 +1,16 @@
+name: commitlint
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited, reopened]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Lint commits with Conventional Commits
+        uses: wagoid/commitlint-github-action@v6
+

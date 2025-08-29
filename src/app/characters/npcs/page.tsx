@@ -40,16 +40,23 @@ export default function NPCPresetsPage() {
       const data = await uploadJSON();
       const arr = data as unknown;
       if (!Array.isArray(arr)) throw new Error("JSON is not an array");
-      const imported: NPCPreset[] = arr.map((r: any) => ({
-        id: typeof r.id === "string" ? r.id : newId(),
-        name: String(r.name ?? "Unnamed"),
-        init: typeof r.init === "number" ? r.init : undefined,
-        ac: typeof r.ac === "number" ? r.ac : undefined,
-        hp: typeof r.hp === "string" ? r.hp : undefined,
-        notes: typeof r.notes === "string" ? r.notes : undefined,
-        attitude: (attitudes as string[]).includes(r.attitude) ? (r.attitude as Attitude) : "Neutral",
-        tags: Array.isArray(r.tags) ? r.tags.map(String) : [],
-      }));
+      const imported: NPCPreset[] = arr.map((r) => {
+        const o = r as Record<string, unknown>;
+        const attitudeVal = o.attitude;
+        return {
+          id: typeof o.id === "string" ? (o.id as string) : newId(),
+          name: String(o.name ?? "Unnamed"),
+          init: typeof o.init === "number" ? (o.init as number) : undefined,
+          ac: typeof o.ac === "number" ? (o.ac as number) : undefined,
+          hp: typeof o.hp === "string" ? (o.hp as string) : undefined,
+          notes: typeof o.notes === "string" ? (o.notes as string) : undefined,
+          attitude:
+            typeof attitudeVal === "string" && (attitudes as string[]).includes(attitudeVal)
+              ? (attitudeVal as Attitude)
+              : "Neutral",
+          tags: Array.isArray(o.tags) ? (o.tags as unknown[]).map(String) : [],
+        };
+      });
       setNPCs(imported);
       toast.success(`Imported ${imported.length} NPCs`);
     } catch (e: unknown) {

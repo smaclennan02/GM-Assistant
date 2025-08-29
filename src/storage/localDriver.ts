@@ -28,6 +28,7 @@ export const localDriver: StorageDriver = {
     } catch {}
   },
   ping(key: string) {
+    void key; // mark as used (no-op)
     // No-op; native 'storage' event handles cross-tab sync
   }
 };
