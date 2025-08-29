@@ -187,7 +187,8 @@ export default function CharacterSheetPage() {
           </Labeled>
           <Labeled className="md:col-span-1">
             <label className="text-xs opacity-70">Created / Updated</label>
-            <div className=\ text-sm opacity-70 p-2 border rounded\>- • -</div>
+            <div className="text-sm opacity-70 p-2 border rounded">- • -</div>
+
           </Labeled>
         </div>
       </section>
