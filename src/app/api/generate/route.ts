@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateNPC } from "@/lib/generators/npc";
-import { generateMonster } from "@/lib/generators/monster";
+import { generateMonster, types as monsterTypes } from "@/lib/generators/monster";
 
 const BodySchema = z.object({
   tool: z.enum(["npc", "monster"]),
@@ -11,7 +11,7 @@ const BodySchema = z.object({
       occupation: z.string().optional(), // npc-only
       seed: z.string().optional(),
       crHint: z.number().int().min(0).max(10).optional(), // monster-only
-      typeHint: z.string().optional(), // monster-only
+      typeHint: z.enum([...monsterTypes]).optional(), // monster-only
     })
     .optional(),
 });
@@ -23,9 +23,9 @@ export async function POST(req: Request) {
 
     if (body.tool === "npc") {
       const npc = generateNPC({
+        seed: body.options?.seed,
         ancestry: body.options?.ancestry,
         occupation: body.options?.occupation,
-        seed: body.options?.seed,
       });
       return NextResponse.json({ ok: true, data: npc });
     }

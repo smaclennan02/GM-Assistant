@@ -19,7 +19,16 @@ const names = [
   "Cinder Imp","Thornback Boar","Moss Golem","Salt Siren","Ravenous Ghast"
 ] as const;
 const sizes: readonly Size[] = ["Small","Medium","Large","Huge"] as const;
-const types = ["Beast","Undead","Fiend","Monstrosity","Dragon","Construct","Fey","Elemental"] as const;
+export const types = [
+  "Beast",
+  "Undead",
+  "Fiend",
+  "Monstrosity",
+  "Dragon",
+  "Construct",
+  "Fey",
+  "Elemental",
+] as const;
 const alignments = ["Unaligned","LE","CE","NE","CG","NN"] as const;
 const speeds = ["30 ft.","40 ft.","30 ft., climb 20 ft.","30 ft., fly 40 ft.","20 ft., swim 30 ft."] as const;
 
@@ -38,11 +47,18 @@ const actionPool: readonly Readonly<[string, string]>[] = [
   ["Shadow Grasp (Recharge 6)", "The target must succeed on a DC 13 Strength saving throw or be restrained by shadowy tendrils until the end of its next turn."],
 ];
 
-export function generateMonster(options?: { seed?: string; crHint?: number; typeHint?: string }) {
+export function generateMonster(options?: {
+  seed?: string;
+  crHint?: number;
+  typeHint?: typeof types[number];
+}) {
   const r = rng(toSeedNum(options?.seed));
   const name = pick(names, r);
   const size = pick(sizes, r);
-  const type = (options?.typeHint as typeof types[number]) ?? pick(types, r);
+  if (options?.typeHint && !types.includes(options.typeHint)) {
+    throw new Error(`Unsupported monster type: ${options.typeHint}`);
+  }
+  const type = options?.typeHint ?? pick(types, r);
   const alignment = pick(alignments, r);
   const baseAC: Record<Size, number> = { Small: 12, Medium: 13, Large: 14, Huge: 15 };
   const armorClass = baseAC[size] + roll(0, 2, r);

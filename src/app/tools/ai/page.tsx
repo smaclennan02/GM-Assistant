@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Wand2, Dice5, Copy, RefreshCcw } from "lucide-react";
 import { toast } from "sonner";
 import type { NPC, Monster } from "@/lib/types";
+import { types as monsterTypes } from "@/lib/generators/monster";
 
 /* ---------- helpers ---------- */
 function toGMPrompt(npc: NPC) {
@@ -85,7 +86,7 @@ export default function AIToolsPage() {
   // Monster state
   const [monLoading, setMonLoading] = useState(false);
   const [mon, setMon] = useState<Monster | null>(null);
-  const [typeHint, setTypeHint] = useState("");
+  const [typeHint, setTypeHint] = useState<typeof monsterTypes[number] | "">("");
   const [crHint, setCrHint] = useState("");
   const [monSeed, setMonSeed] = useState("");
 
@@ -104,9 +105,9 @@ const genNPC = useCallback(async () => {
       body: JSON.stringify({
         tool: "npc",
         options: {
+          seed: npcSeed || undefined,
           ancestry: ancestry || undefined,
           occupation: occupation || undefined,
-          seed: npcSeed || undefined,
         },
       }),
     });
@@ -123,18 +124,31 @@ const genNPC = useCallback(async () => {
 }, [ancestry, occupation, npcSeed]);
 
 const genMonster = useCallback(async () => {
+  if (typeHint && !monsterTypes.includes(typeHint)) {
+    toast.error("Unsupported monster type");
+    return;
+  }
   setMonLoading(true);
   try {
+    const crNum = Number(crHint);
+    const opts: Record<string, unknown> = {
+      typeHint: typeHint || undefined,
+      seed: monSeed || undefined,
+    };
+    if (crHint) {
+      if (Number.isFinite(crNum)) {
+        opts.crHint = crNum;
+      } else {
+        toast.warning("Invalid CR hint. Ignoring value.");
+      }
+    }
+
     const res = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tool: "monster",
-        options: {
-          typeHint: typeHint || undefined,
-          crHint: crHint ? Number(crHint) : undefined,
-          seed: monSeed || undefined,
-        },
+        options: opts,
       }),
     });
     const json = await res.json();
@@ -236,11 +250,28 @@ useEffect(() => {
               <div className="grid sm:grid-cols-3 gap-3">
                 <div>
                   <label className="text-sm opacity-80">Type hint (optional)</label>
-                  <Input value={typeHint} onChange={(e) => setTypeHint(e.target.value)} placeholder="Undead, Beast, Fiend…" />
+                  <Input
+                    value={typeHint}
+                    onChange={(e) => setTypeHint(e.target.value as typeof monsterTypes[number] | "")}
+                    list="monster-types"
+                    placeholder="Undead, Beast, Fiend…"
+                  />
+                  <datalist id="monster-types">
+                    {monsterTypes.map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="text-sm opacity-80">CR hint (0–10, optional)</label>
-                  <Input type="number" value={crHint} onChange={(e) => setCrHint(e.target.value)} placeholder="e.g., 2" />
+                  <Input
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={crHint}
+                    onChange={(e) => setCrHint(e.target.value)}
+                    placeholder="e.g., 2"
+                  />
                 </div>
                 <div>
                   <label className="text-sm opacity-80">Seed (optional)</label>

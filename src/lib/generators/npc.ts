@@ -1,5 +1,20 @@
 import { nanoid } from "nanoid";
-const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+
+function rng(seed: number) {
+  let x = seed || 2463534242;
+  return () => {
+    x ^= x << 13;
+    x ^= x >>> 17;
+    x ^= x << 5;
+    return ((x >>> 0) % 100000) / 100000;
+  };
+}
+
+const toSeedNum = (s?: string) =>
+  s ? Array.from(s).reduce((a, c) => a + c.charCodeAt(0), 0) : 0;
+
+const pick = <T,>(arr: readonly T[], r: () => number): T =>
+  arr[Math.floor(r() * arr.length)];
 
 const names = [
   "Elira Blackthorn","Garrick Dunbar","Mira Thistle","Cassian Montclair",
@@ -28,18 +43,24 @@ const hooks = [
   "Seeks rare herbs to cure a wasting illness"
 ];
 
-export function generateNPC(seed?: Partial<{ ancestry: string; occupation: string }>) {
+export function generateNPC(options?: {
+  seed?: string;
+  ancestry?: string;
+  occupation?: string;
+}) {
+  const r = rng(toSeedNum(options?.seed));
+
   return {
     id: nanoid(8),
-    name: pick(names),
-    ancestry: seed?.ancestry ?? pick(ancestries),
-    occupation: seed?.occupation ?? pick(occupations),
-    disposition: pick(dispositions),
-    quirk: pick(quirks),
-    bond: pick(bonds),
-    ideal: pick(ideals),
-    flaw: pick(flaws),
-    voiceHint: pick(voices),
-    hook: pick(hooks),
+    name: pick(names, r),
+    ancestry: options?.ancestry ?? pick(ancestries, r),
+    occupation: options?.occupation ?? pick(occupations, r),
+    disposition: pick(dispositions, r),
+    quirk: pick(quirks, r),
+    bond: pick(bonds, r),
+    ideal: pick(ideals, r),
+    flaw: pick(flaws, r),
+    voiceHint: pick(voices, r),
+    hook: pick(hooks, r),
   };
 }
