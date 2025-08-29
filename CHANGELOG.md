@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org) and the format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0](https://github.com/smaclennan02/GM-Assistant/compare/v0.5.0...v0.6.0) (2025-08-29)
+
+
+### Features
+
+* **monster:** enhance type handling and validation for monster generation ([6f90571](https://github.com/smaclennan02/GM-Assistant/commit/6f90571c40d66c34a17579d3ed2d72a1befd4415))
+* **npc:** refactor NPC generation to use seeded randomization ([6f90571](https://github.com/smaclennan02/GM-Assistant/commit/6f90571c40d66c34a17579d3ed2d72a1befd4415))
+
+
+### Bug Fixes
+
+* **characters/sheet:** correct malformed className attribute (remove stray backslashes, add quotes) ([4feb64c](https://github.com/smaclennan02/GM-Assistant/commit/4feb64c3e3c6541658a1b8a04af2fa24a5efc8ca))
+* **characters:** align storage with Encounters (CharactersState shape, numeric updatedAt) and add link to Encounters Suite ([8eaabd8](https://github.com/smaclennan02/GM-Assistant/commit/8eaabd8283f710287c340c5d435e8f48287924a3))
+
 ## [Unreleased]
 
 ### Planned
